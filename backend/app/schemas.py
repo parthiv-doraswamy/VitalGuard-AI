@@ -46,3 +46,25 @@ class RiskPrediction(BaseModel):
         "diagnosis, triage, or treatment decisions."
     )
 
+
+
+class NEWS2Input(BaseModel):
+    """Fictional observation for the NEWS2 scoring demonstration."""
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(default="DEMO-NEWS2-001", min_length=1, max_length=64)
+    respiratory_rate: int = Field(ge=1, le=100)
+    spo2: int = Field(ge=50, le=100)
+    systolic_bp: int = Field(ge=20, le=300)
+    heart_rate: int = Field(ge=1, le=250)
+    temperature: float = Field(ge=30, le=45)
+    consciousness: Literal["alert", "new_confusion", "voice", "pain", "unresponsive"] = "alert"
+    supplemental_oxygen: bool = False
+    spo2_scale: Literal[1, 2] = 1
+    scale2_authorized: bool = False
+
+    @model_validator(mode="after")
+    def validate_scale_2_authorization(self):
+        if self.spo2_scale == 2 and not self.scale2_authorized:
+            raise ValueError("SpO2 Scale 2 requires an explicit clinician-authorization assertion")
+        return self
