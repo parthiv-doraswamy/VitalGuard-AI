@@ -9,6 +9,7 @@ from .model_evaluation import coefficient_contributions, evaluate_synthetic_hold
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
+from .timeline_routes import router as timeline_router
 from .alert_routes import router as alert_router
 from .alert_service import create_alert
 from .data_quality import assess_observations
@@ -24,6 +25,7 @@ app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(simulator_router)
 app.include_router(alert_router)
+app.include_router(timeline_router)
 _default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://vitalguard-ai-g215.onrender.com"]
 _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
