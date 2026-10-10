@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/live-api-smoke.yml'
       - 'scripts/smoke-test.mjs'
+      - 'backend/requirements.txt'
   workflow_dispatch:
     inputs:
       api_base_url:
