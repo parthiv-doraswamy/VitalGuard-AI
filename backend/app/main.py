@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 import os
+import uuid
 from fastapi import FastAPI, Query, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.requests import Request
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
 from .schemas import RiskPrediction, VitalInput
@@ -25,6 +27,18 @@ _default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://v
 _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
     allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Attach baseline response headers and a server-generated request ID."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Request-ID"] = str(uuid.uuid4())
+    return response
 
 async def _publish_observation(patient_id: str, values: dict, result: RiskPrediction, saved: dict) -> None:
     await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
