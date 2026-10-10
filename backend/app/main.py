@@ -37,6 +37,17 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root():
+    return {
+        "service": "VitalGuard AI Risk Engine",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+        "demo_only": True,
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_version": MODEL_VERSION, "demo_only": True}
