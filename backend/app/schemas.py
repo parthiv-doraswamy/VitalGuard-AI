@@ -33,6 +33,8 @@ class RiskFactor(BaseModel):
 
 class RiskPrediction(BaseModel):
     patient_id: str
+    observation_id: int | None = None
+    created_at: str | None = None
     risk_score: int = Field(ge=0, le=100)
     risk_level: Literal["low", "moderate", "high", "critical"]
     model_probability: float = Field(ge=0, le=1)
@@ -43,3 +45,4 @@ class RiskPrediction(BaseModel):
         "Synthetic demonstration only. Not clinically validated and not for "
         "diagnosis, triage, or treatment decisions."
     )
+
