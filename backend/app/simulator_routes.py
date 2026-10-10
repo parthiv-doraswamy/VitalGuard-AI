@@ -2,6 +2,7 @@
 from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
+from .live_events import hub
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .schemas import RiskPrediction
 from .simulator import observation_for_step
@@ -16,8 +17,8 @@ class SimulationRequest(BaseModel):
     step: int = Field(default=0, ge=0, le=1000)
 
 @router.post("/observations", response_model=RiskPrediction)
-def submit_demo_observation(payload: SimulationRequest):
-    """Generate, score, and persist one fictional observation; each POST is new."""
+async def submit_demo_observation(payload: SimulationRequest):
+    """Generate, score, persist, then broadcast one fictional observation."""
     values = observation_for_step(payload.scenario, payload.step)
     probability = predict_probability(values)
     score = round(probability * 100)
@@ -25,4 +26,8 @@ def submit_demo_observation(payload: SimulationRequest):
         risk_level=risk_level(score), model_probability=round(probability, 4),
         factors=explain(values), model_version=MODEL_VERSION)
     saved = save_observation(payload.patient_id, values, result.model_dump())
-    return result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
+    response = result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
+    await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
+        "patient_id": payload.patient_id, "created_at": saved["created_at"],
+        "observation": values, "prediction": response.model_dump(), "demo_only": True})
+    return response
