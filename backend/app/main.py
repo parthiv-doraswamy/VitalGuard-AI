@@ -7,6 +7,7 @@ from .schemas import RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
 from .alert_routes import router as alert_router
 from .alert_service import create_alert
+from .data_quality import assess_observations
 from .live_events import hub
 from .storage import database_health, initialize_storage, list_observations, save_observation
 
@@ -15,7 +16,7 @@ async def lifespan(_app: FastAPI):
     initialize_storage()
     yield
 
-app = FastAPI(title="VitalGuard AI Risk Engine", version="0.6.0",
+app = FastAPI(title="VitalGuard AI Risk Engine", version="0.7.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(simulator_router)
 app.include_router(alert_router)
@@ -25,29 +26,16 @@ app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _
     allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 async def _publish_observation(patient_id: str, values: dict, result: RiskPrediction, saved: dict) -> None:
-    await hub.broadcast({
-        "type": "observation.created",
-        "event_id": saved["id"],
-        "patient_id": patient_id,
-        "created_at": saved["created_at"],
-        "observation": values,
-        "prediction": result.model_dump(),
-        "demo_only": True,
-    })
+    await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
+        "patient_id": patient_id, "created_at": saved["created_at"], "observation": values,
+        "prediction": result.model_dump(), "demo_only": True})
 
-def _maybe_create_alert(patient_id: str, score: int, level: str, observation_id: int, values: dict) -> dict | None:
-    # Demo threshold only. Not a validated clinical alarm rule.
+def _maybe_create_alert(patient_id: str, score: int, level: str, observation_id: int, values: dict):
     if score < 65:
         return None
-    alert = create_alert(
-        patient_id=patient_id,
-        event_key=f"observation:{observation_id}:elevated-risk",
-        severity="critical" if level == "critical" else "high",
-        title=f"{level.title()} demo risk score",
-        details={"observation_id": observation_id, "risk_score": score, "risk_level": level,
-                 "vitals": values, "demo_only": True},
-    )
-    return alert
+    return create_alert(patient_id=patient_id, event_key=f"observation:{observation_id}:elevated-risk",
+        severity="critical" if level == "critical" else "high", title=f"{level.title()} demo risk score",
+        details={"observation_id": observation_id, "risk_score": score, "risk_level": level, "vitals": values, "demo_only": True})
 
 @app.get("/")
 def root():
@@ -95,3 +83,9 @@ def observation_history(patient_id: str | None = Query(default=None, min_length=
     next_cursor = records[-1]["id"] if len(records) == limit else None
     return {"items": records, "count": len(records), "limit": limit, "next_before_id": next_cursor,
         "demo_only": True, "disclaimer": "Synthetic demonstration records only; not for clinical use."}
+
+@app.get("/api/v1/observations/quality")
+def observation_quality(stale_after_seconds: int = Query(default=300, ge=30, le=86400),
+    limit: int = Query(default=100, ge=1, le=100)):
+    records = list_observations(limit=limit)
+    return assess_observations(records, stale_after_seconds=stale_after_seconds)
