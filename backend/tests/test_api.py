@@ -92,3 +92,30 @@ def test_diastolic_pressure_must_be_lower_than_systolic(client):
 def test_history_limit_is_bounded(client):
     response = client.get("/api/v1/observations", params={"limit": 101})
     assert response.status_code == 422
+
+
+
+def test_postgres_database_url_is_normalized(monkeypatch):
+    from app.storage import _database_url
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://demo:secret@localhost:5432/vitalguard")
+    assert _database_url() == "postgresql+psycopg://demo:secret@localhost:5432/vitalguard"
+
+
+def test_configured_sqlite_database_url_is_supported(tmp_path, monkeypatch):
+    from app.storage import list_observations, save_observation
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'configured.sqlite3'}")
+    monkeypatch.delenv("VITALGUARD_DB_PATH", raising=False)
+
+    saved = save_observation(
+        "DEMO-DB-URL",
+        {"age": 58, "spo2": 98},
+        {"model_version": "test-model", "risk_score": 12},
+    )
+    rows = list_observations(patient_id="DEMO-DB-URL", limit=10)
+
+    assert saved["id"] > 0
+    assert len(rows) == 1
+    assert rows[0]["inputs"]["spo2"] == 98
+    assert rows[0]["prediction"]["risk_score"] == 12
