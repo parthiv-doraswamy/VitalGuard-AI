@@ -9,6 +9,7 @@ import { RiskPanel, News2Panel } from '../components/risk/RiskPanels.tsx';
 import { useSimulation } from '../store/useSimulation.ts';
 import { TrajCard } from './TrajCard.tsx';
 import { ExplainCard, VitalCharts, AlertList } from './DetailSections.tsx';
+import { BackendPatientTimeline } from '../components/patients/BackendPatientTimeline.tsx';
 export function fmtAgo(iso: string): string {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (m < 1) return 'Just now';
@@ -55,6 +56,7 @@ export function PatientDetailPage() {
       <ExplainCard patientId={patient.id} />
       <VitalCharts patientId={patient.id} />
       <AlertList patientId={patient.id} />
+      <BackendPatientTimeline patientId={patient.id} />
     </Shell>
   );
 }
