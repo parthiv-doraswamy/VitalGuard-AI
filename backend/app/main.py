@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
+import asyncio
 import os
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .schemas import RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
+from .live_events import hub
 from .storage import database_health, initialize_storage, list_observations, save_observation
 
 @asynccontextmanager
@@ -12,14 +14,24 @@ async def lifespan(_app: FastAPI):
     initialize_storage()
     yield
 
-app = FastAPI(title="VitalGuard AI Risk Engine", version="0.4.0",
-    description="Synthetic demo risk API. Not clinically validated and not for clinical use.",
-    lifespan=lifespan)
+app = FastAPI(title="VitalGuard AI Risk Engine", version="0.5.0",
+    description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(simulator_router)
 _default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://vitalguard-ai-g215.onrender.com"]
 _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
     allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+
+async def _publish_observation(patient_id: str, values: dict, result: RiskPrediction, saved: dict) -> None:
+    await hub.broadcast({
+        "type": "observation.created",
+        "event_id": saved["id"],
+        "patient_id": patient_id,
+        "created_at": saved["created_at"],
+        "observation": values,
+        "prediction": result.model_dump(),
+        "demo_only": True,
+    })
 
 @app.get("/")
 def root():
@@ -29,10 +41,14 @@ def root():
 def health():
     try:
         database = database_health()
-        return {"status": "ok", "model_version": MODEL_VERSION, "database": database, "demo_only": True}
+        return {"status": "ok", "model_version": MODEL_VERSION, "database": database, "websocket": "available", "demo_only": True}
     except Exception:
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="Database health check failed")
+
+@app.websocket("/api/v1/live")
+async def live_socket(websocket: WebSocket):
+    await hub.serve(websocket)
 
 @app.get("/api/v1/model/info")
 def model_info():
@@ -42,14 +58,16 @@ def model_info():
         "training_data": "generated synthetic observations only", "demo_only": True, "clinically_validated": False}
 
 @app.post("/api/v1/risk/predict", response_model=RiskPrediction)
-def predict(payload: VitalInput):
+async def predict(payload: VitalInput):
     values = payload.model_dump(exclude={"patient_id"})
     probability = predict_probability(values)
     score = round(probability * 100)
     result = RiskPrediction(patient_id=payload.patient_id, risk_score=score, risk_level=risk_level(score),
         model_probability=round(probability, 4), factors=explain(values), model_version=MODEL_VERSION)
     saved = save_observation(payload.patient_id, values, result.model_dump())
-    return result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
+    response = result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
+    await _publish_observation(payload.patient_id, values, response, saved)
+    return response
 
 @app.get("/api/v1/observations")
 def observation_history(patient_id: str | None = Query(default=None, min_length=1, max_length=64),
