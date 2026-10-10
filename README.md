@@ -2,112 +2,148 @@
 
 > **DEMO ONLY · SYNTHETIC DATA · NOT FOR CLINICAL USE**
 >
-> VitalGuard AI is a software prototype for exploring patient-observation monitoring, risk-signal visualisation and alert workflows. The included patients and observations are synthetic. The current risk signals and NEWS2-like display are demo logic, not a clinically validated prediction system or a substitute for professional judgement.
+> VitalGuard AI is a software prototype for exploring patient-observation monitoring, risk-signal visualisation and alert workflows. The included patients and observations are synthetic. The current risk model is trained on generated data and is not clinically validated.
 
 ## Requirements
 
 - Node.js 20 or newer (Node.js 22 LTS recommended)
 - npm 10 or newer
+- Python 3.11+ recommended for the FastAPI backend
 
 ## Quick start
 
+Frontend:
 ```bash
 npm ci
 cp .env.example .env
 npm run dev
 ```
 
-Vite prints the local URL (normally `http://localhost:5173`).
+Backend (from the repository root):
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cd backend
+uvicorn app.main:app --reload
+```
+
+The frontend normally runs at `http://localhost:5173`; the backend at `http://localhost:8000`. API docs are at `http://localhost:8000/docs`.
 
 ## Verification commands
 
-Run these from the project root:
-
+Run from the project root:
 ```bash
-npm run lint    # TypeScript check
-npm test        # Vitest suite
-npm run build   # TypeScript project build + Vite production bundle
-npm run preview # Serve the generated dist/ bundle locally
+npm run lint
+npm test
+npm run build
 ```
 
-A command should be described as passing only after it has been run successfully against the current source and dependency environment. Previously generated build files are not proof that the current source builds.
+Run backend tests from `backend/`:
+```bash
+pytest -q
+```
+
+Only describe a command as passing after it has been run successfully against the current source.
 
 ## Environment configuration
 
-Copy `.env.example` to `.env` for local development. Vite variables prefixed with `VITE_` are bundled into browser code, so **never store API keys, passwords, tokens, or other secrets in them**.
+Copy `.env.example` to `.env` for local development. Vite variables prefixed with `VITE_` are bundled into browser code, so never store secrets in them.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `VITE_DEMO_MODE` | `true` | Starts in synthetic demo mode unless explicitly set to `false`. |
-| `VITE_API_BASE_URL` | production: deployed Render API; local: `http://localhost:8000` | Optional override for the FastAPI risk service. |
-| `VITE_APP_VERSION` | `0.1.0-demo` | Version label displayed by the app. |
+| Variable | Purpose |
+| --- | --- |
+| `VITE_DEMO_MODE` | Starts in synthetic demo mode unless explicitly set to `false`. |
+| `VITE_API_BASE_URL` | Optional FastAPI base URL; local default is normally `http://localhost:8000`. |
+| `VITE_APP_VERSION` | Frontend version label. |
+| `DATABASE_URL` | Optional backend database URL; SQLite is used by default. |
+| `VITALGUARD_DB_PATH` | Optional local SQLite file path for tests/development. |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origins. |
 
-## Current implementation status
+## Current implementation
 
-- React, TypeScript, Vite and Tailwind-based frontend.
-- Dashboard, patient directory, patient detail, alerts, analytics, settings and not-found pages.
-- Eight synthetic patients with sample vital histories, risk signals and alerts.
-- Demo simulation controls and local browser persistence for theme and alert status.
-- Typed API client for the synthetic risk-prediction and observation-history endpoints.
-- Settings → Synthetic risk engine panel to check API health, submit a fixed fictional observation, view model output and browse saved demo predictions.
+- React, TypeScript, Vite and Tailwind frontend with dashboard, patient directory/detail, alerts, analytics and settings.
+- Existing synthetic patient records, demo simulation controls and local UI persistence.
+- FastAPI risk endpoint, model metadata endpoint, bounded observation history and synthetic Logistic Regression model.
+- SQLAlchemy storage adapter supporting local SQLite and PostgreSQL when `DATABASE_URL` is configured.
+- Phase 1 adds a deterministic backend simulator for stable, worsening, and recovering fictional observation scenarios.
 
-### Important limitations
+### Phase 1 API: synthetic observation ingestion
 
-- The default experience uses local synthetic data.
-- Simulation changes and risk scores are scenario-driven demo values; they are not produced by a trained ML model.
-- The prediction demo is integrated with the FastAPI risk service, but the dashboard's patient directory, vitals, alerts and analytics still use local synthetic data. This is a partial integration, not a complete backend-backed application.
-- Risk contributors are illustrative. The current NEWS2-like value is not a validated independent NEWS2 calculation.
-- No clinical performance, safety, or regulatory validation is claimed.
+Endpoint:
+`POST /api/v1/demo/observations`
+
+Example request:
+```json
+{
+  "patient_id": "DEMO-LIVE-001",
+  "scenario": "worsening",
+  "step": 3
+}
+```
+
+Supported scenarios: `stable`, `worsening`, `recovering`. Step must be between 0 and 1000. The endpoint generates one deterministic observation for the requested scenario and step, runs the current synthetic risk model, and persists the resulting observation/prediction using the configured storage adapter.
+
+Example local request:
+```bash
+curl -X POST http://localhost:8000/api/v1/demo/observations \
+  -H 'Content-Type: application/json' \
+  -d '{"patient_id":"DEMO-LIVE-001","scenario":"worsening","step":3}'
+```
+
+History can be inspected at:
+`GET /api/v1/observations?patient_id=DEMO-LIVE-001`
+
+This is an API-level simulator, not a continuous streaming feed yet. Each request creates a new observation; requests are not idempotent. WebSocket delivery, frontend integration, and durable hosted PostgreSQL configuration are future phases.
+
+## Important limitations
+
+- The default frontend still uses local synthetic data for the patient directory, vital charts, alerts and analytics. Those views are not yet fully connected to the backend event stream.
+- The model is a StandardScaler + LogisticRegression classifier trained on generated synthetic observations. Its output is a demo signal, not a validated probability of clinical deterioration.
+- Feature explanations are illustrative threshold indicators, not SHAP explanations or causal attributions.
+- The existing NEWS2-like display is not a validated NEWS2 implementation.
+- No clinical performance, safety, regulatory or real-device integration is claimed.
+- Do not use real patient data or use this prototype to diagnose, triage, or make treatment decisions.
 
 ## Project layout
 
 ```text
+backend/app/
+  main.py              FastAPI application
+  model.py             Synthetic demo classifier
+  schemas.py           Validated API request/response schemas
+  simulator.py         Deterministic fictional observation scenarios
+  simulator_routes.py  Demo observation ingestion endpoint
+  storage.py           SQLite/PostgreSQL storage adapter
+backend/tests/
+  test_api.py
+  test_simulator.py
 src/
-  data/       Synthetic patients, observations, risk signals and alerts
-  pages/      Dashboard, patients, patient detail, alerts, analytics, settings
-  services/   Configuration, API client, demo data provider and simulation logic
-  store/      React simulation context and initial snapshots
-  test/       Vitest and React Testing Library tests
-  theme/      Shared risk and chart tokens
-  types/      Shared TypeScript data types
-  utils/      Formatting helpers
+  data/                Synthetic frontend fixtures
+  pages/               Dashboard and feature pages
+  services/            API and demo data services
+  store/               Frontend state
+  test/                Frontend tests
+docs/
+  REALTIME_DEMO_ROADMAP.md
 ```
 
-## Demo scenarios
+## Database configuration
 
-The synthetic dataset includes stable, worsening and recovering scenarios. These scenarios are provided to demonstrate the interface and alert flow only; they do not represent clinical advice or validated patient trajectories.
-
-## Development hygiene
-
-- `node_modules/`, `dist/`, local `.env` files and TypeScript build metadata are ignored by Git.
-- Commit `.env.example`, not a developer's `.env` file.
-- Keep test data synthetic and do not add identifiable patient information.
-- Before deployment, verify the build, tests, environment configuration, API failure handling and all key browser workflows.
-
-## Backend database configuration
-
-- Local development defaults to a SQLite file at `backend/vitalguard_demo.sqlite3`.
-- Hosted deployments can set `DATABASE_URL` to a PostgreSQL connection string. The adapter normalizes Render-style `postgres://` and standard `postgresql://` URLs to the installed psycopg 3 driver.
-- Do not commit database credentials. Set `DATABASE_URL` only in the backend service's private environment settings.
-- The hosted PostgreSQL database must be provisioned separately and configured on the backend service before hosted history is durable across instance replacement. Existing SQLite records are not automatically migrated.
-- This database adapter is for synthetic demonstration data only; it is not a production patient-record system.
+- Local development defaults to SQLite.
+- Hosted deployments can set `DATABASE_URL` to a PostgreSQL connection string. The adapter normalizes common `postgres://` and `postgresql://` URLs to psycopg 3.
+- Configure credentials only in the backend service's private environment settings; do not commit them.
+- Provision the hosted database separately. Existing SQLite records are not automatically migrated.
+- This storage adapter currently supports synthetic demonstration data only; it is not a production patient-record system.
 
 ## Live API smoke test
 
-A manually triggered GitHub Actions workflow checks the deployed API's health endpoint, model metadata, frontend CORS preflight, synthetic prediction response, persisted observation history, and invalid-input rejection. It uses a unique `SMOKE-*` demo patient ID and synthetic values only.
+A manually triggered GitHub Actions workflow checks the deployed API's health endpoint, model metadata, frontend CORS preflight, synthetic prediction response, persisted observation history, and invalid-input rejection.
 
 - Workflow: `.github/workflows/live-api-smoke.yml`
 - Script: `scripts/smoke-test.mjs`
-- Run it from GitHub: **Actions → Live API smoke test → Run workflow**.
-- The workflow tests the live service and can create one synthetic demo observation per run. Do not send real patient data.
+- Run via GitHub Actions → Live API smoke test → Run workflow.
+- The workflow creates synthetic demo records; never send real patient data.
 
-## Planned next steps
+## Roadmap
 
-1. Establish a clean, reproducible frontend build and test baseline.
-2. Verify core user journeys and responsive layouts.
-3. Define the prediction target and dataset for an evaluated ML baseline.
-4. Add the FastAPI synthetic risk service with validated request/response contracts.
-5. Persist demo predictions in SQLite and expose bounded, filterable observation history.
-6. Integrate the Settings risk-engine panel with API health, prediction and history workflows.
-7. Add and run live API smoke checks for health, CORS, predictions, history and invalid inputs.
-8. Complete browser end-to-end tests and configure persistent storage before treating history as durable.
+See [docs/REALTIME_DEMO_ROADMAP.md](docs/REALTIME_DEMO_ROADMAP.md) for phases, acceptance criteria, and current limitations. The planned sequence is durable data storage → WebSocket event delivery → alert lifecycle → patient timeline/data quality → clinical scoring and evaluated ML → explainability → access controls → end-to-end demo hardening.
