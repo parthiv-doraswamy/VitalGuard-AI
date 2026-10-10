@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
-from .schemas import RiskPrediction, VitalInput
+from .news2 import score_news2
+from .schemas import NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
 from .alert_routes import router as alert_router
 from .alert_service import create_alert
@@ -74,6 +75,11 @@ def model_info():
         "algorithm": "StandardScaler + LogisticRegression",
         "features": ["age", "heart_rate", "spo2", "systolic_bp", "diastolic_bp", "temperature", "respiratory_rate"],
         "training_data": "generated synthetic observations only", "demo_only": True, "clinically_validated": False}
+
+@app.post("/api/v1/scores/news2")
+def calculate_news2(payload: NEWS2Input):
+    """Calculate parameter points for a fictional NEWS2 example; not clinical guidance."""
+    return score_news2(payload.model_dump(exclude={"patient_id", "scale2_authorized"}))
 
 @app.get("/api/v1/model/evaluation")
 def model_evaluation():
