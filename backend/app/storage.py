@@ -43,11 +43,18 @@ def _engine() -> Engine:
     return create_engine(url, connect_args={"check_same_thread": False} if url.startswith("sqlite") else {}, pool_pre_ping=True)
 
 
+def _ensure_schema(engine: Engine) -> None:
+    # The database URL can be configured independently in tests and deployments.
+    # create_all is idempotent and ensures the selected database has our table.
+    _METADATA.create_all(engine)
+
+
 def initialize_storage() -> None:
     engine = _engine()
     try:
         from .migrations import migrate
         migrate(engine)
+        _ensure_schema(engine)
     finally:
         engine.dispose()
 
@@ -55,6 +62,7 @@ def initialize_storage() -> None:
 def database_health() -> dict[str, str]:
     engine = _engine()
     try:
+        _ensure_schema(engine)
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
         return {"status": "ok", "backend": "postgresql" if engine.dialect.name == "postgresql" else "sqlite"}
@@ -65,6 +73,7 @@ def database_health() -> dict[str, str]:
 def save_observation(patient_id: str, inputs: dict[str, Any], prediction: dict[str, Any]) -> dict[str, Any]:
     engine = _engine()
     try:
+        _ensure_schema(engine)
         with engine.begin() as connection:
             result = connection.execute(insert(_OBSERVATIONS).values(
                 patient_id=patient_id,
@@ -82,6 +91,7 @@ def save_observation(patient_id: str, inputs: dict[str, Any], prediction: dict[s
 def list_observations(patient_id: str | None = None, limit: int = 50, before_id: int | None = None) -> list[dict[str, Any]]:
     engine = _engine()
     try:
+        _ensure_schema(engine)
         query = select(_OBSERVATIONS)
         if patient_id is not None:
             query = query.where(_OBSERVATIONS.c.patient_id == patient_id)
@@ -100,5 +110,4 @@ def _serialize(row: Any) -> dict[str, Any]:
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
     return {"id": row["id"], "patient_id": row["patient_id"], "created_at": created_at,
-            "inputs": json.loads(row["input_json"]), "prediction": json.loads(row["prediction_json"]),
-            "model_version": row["model_version"]}
+            "inputs": json.loads(row["input_json"]), "prediction": json.loads(row["prediction_json"]), "model_version": row["model_version"]}
