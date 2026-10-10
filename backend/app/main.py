@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .schemas import RiskPrediction, VitalInput
+from .simulator_routes import router as simulator_router
 from .storage import initialize_storage, list_observations, save_observation
 
 
@@ -17,10 +18,14 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="VitalGuard AI Risk Engine",
-    version="0.2.0",
-    description="Prototype API trained on generated synthetic observations. Not clinically validated and not for clinical use.",
+    version="0.3.0",
+    description=(
+        "Demo API for synthetic observations and risk-signal visualization. "
+        "Not clinically validated and not for clinical use."
+    ),
     lifespan=lifespan,
 )
+app.include_router(simulator_router)
 
 _default_origins = [
     "http://localhost:5173",
@@ -59,7 +64,10 @@ def model_info():
         "name": "VitalGuard synthetic risk classifier",
         "model_version": MODEL_VERSION,
         "algorithm": "StandardScaler + LogisticRegression",
-        "features": ["age", "heart_rate", "spo2", "systolic_bp", "diastolic_bp", "temperature", "respiratory_rate"],
+        "features": [
+            "age", "heart_rate", "spo2", "systolic_bp",
+            "diastolic_bp", "temperature", "respiratory_rate",
+        ],
         "training_data": "generated synthetic observations only",
         "demo_only": True,
         "clinically_validated": False,
@@ -80,7 +88,9 @@ def predict(payload: VitalInput):
         model_version=MODEL_VERSION,
     )
     saved = save_observation(payload.patient_id, values, result.model_dump())
-    return result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
+    return result.model_copy(
+        update={"observation_id": saved["id"], "created_at": saved["created_at"]}
+    )
 
 
 @app.get("/api/v1/observations")
@@ -90,7 +100,9 @@ def observation_history(
     before_id: int | None = Query(default=None, ge=1),
 ):
     """Return recent saved demo predictions, optionally filtered by demo patient ID."""
-    records = list_observations(patient_id=patient_id, limit=limit, before_id=before_id)
+    records = list_observations(
+        patient_id=patient_id, limit=limit, before_id=before_id
+    )
     next_cursor = records[-1]["id"] if len(records) == limit else None
     return {
         "items": records,
