@@ -1,20 +1,17 @@
-"""Small explicit schema migration runner for the VitalGuard demo.
+"""Versioned schema initialization for the VitalGuard demo database.
 
-For a production clinical system, use a reviewed Alembic migration workflow.
-This lightweight runner keeps this prototype's schema evolution explicit.
+This is a minimal migration ledger for the current prototype schema. Use
+Alembic before introducing non-additive production schema changes.
 """
-from sqlalchemy import (
-    Column, DateTime, Integer, MetaData, String, Table, func, insert, select,
-    text,
-)
+from sqlalchemy import Column, DateTime, Integer, MetaData, Table, func, insert, select
 from sqlalchemy.engine import Engine
 
-from .storage_schema import metadata
+from .storage import _METADATA
 
-
+_MIGRATION_METADATA = MetaData()
 MIGRATIONS = Table(
     "schema_migrations",
-    MetaData(),
+    _MIGRATION_METADATA,
     Column("version", Integer, primary_key=True),
     Column("applied_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
@@ -22,10 +19,10 @@ LATEST_VERSION = 1
 
 
 def migrate(engine: Engine) -> None:
-    """Apply additive, idempotent schema changes in version order."""
-    MIGRATIONS.metadata.create_all(engine)
+    """Create the current schema and record its migration version exactly once."""
+    _MIGRATION_METADATA.create_all(engine)
     with engine.begin() as connection:
         applied = set(connection.execute(select(MIGRATIONS.c.version)).scalars())
         if 1 not in applied:
-            metadata.create_all(connection)
+            _METADATA.create_all(connection)
             connection.execute(insert(MIGRATIONS).values(version=1))
