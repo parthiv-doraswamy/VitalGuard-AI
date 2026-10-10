@@ -39,7 +39,7 @@ Copy `.env.example` to `.env` for local development. Vite variables prefixed wit
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `VITE_DEMO_MODE` | `true` | Starts in synthetic demo mode unless explicitly set to `false`. |
-| `VITE_API_BASE_URL` | `http://localhost:8000` | Base URL reserved for the backend API integration. |
+| `VITE_API_BASE_URL` | production: deployed Render API; local: `http://localhost:8000` | Optional override for the FastAPI risk service. |
 | `VITE_APP_VERSION` | `0.1.0-demo` | Version label displayed by the app. |
 
 ## Current implementation status
@@ -48,13 +48,14 @@ Copy `.env.example` to `.env` for local development. Vite variables prefixed wit
 - Dashboard, patient directory, patient detail, alerts, analytics, settings and not-found pages.
 - Eight synthetic patients with sample vital histories, risk signals and alerts.
 - Demo simulation controls and local browser persistence for theme and alert status.
-- API client scaffolding for patient and vital-reading GET endpoints.
+- Typed API client for the synthetic risk-prediction and observation-history endpoints.
+- Settings → Synthetic risk engine panel to check API health, submit a fixed fictional observation, view model output and browse saved demo predictions.
 
 ### Important limitations
 
 - The default experience uses local synthetic data.
 - Simulation changes and risk scores are scenario-driven demo values; they are not produced by a trained ML model.
-- The API client is scaffolding and is not yet the source of truth for all application state. API mode must not be interpreted as complete end-to-end backend integration.
+- The prediction demo is integrated with the FastAPI risk service, but the dashboard's patient directory, vitals, alerts and analytics still use local synthetic data. This is a partial integration, not a complete backend-backed application.
 - Risk contributors are illustrative. The current NEWS2-like value is not a validated independent NEWS2 calculation.
 - No clinical performance, safety, or regulatory validation is claimed.
 
@@ -88,6 +89,7 @@ The synthetic dataset includes stable, worsening and recovering scenarios. These
 1. Establish a clean, reproducible frontend build and test baseline.
 2. Verify core user journeys and responsive layouts.
 3. Define the prediction target and dataset for an evaluated ML baseline.
-4. Implement a FastAPI inference service and explicit observation/risk contracts.
-5. Integrate backend-backed patient observations, predictions and alerts.
-6. Validate end-to-end behavior before deployment.
+4. Add the FastAPI synthetic risk service with validated request/response contracts.
+5. Persist demo predictions in SQLite and expose bounded, filterable observation history.
+6. Integrate the Settings risk-engine panel with API health, prediction and history workflows.
+7. Complete end-to-end tests and configure persistent storage before treating history as durable.
