@@ -1,0 +1,47 @@
+name: Dependency audit report
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dependency-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Report dependency vulnerabilities
+        shell: bash
+        run: |
+          npm audit --json > /tmp/npm-audit.json || true
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('/tmp/npm-audit.json', 'utf8'));
+          console.log('Vulnerability summary:', JSON.stringify(report.metadata?.vulnerabilities ?? {}, null, 2));
+          for (const [name, advisory] of Object.entries(report.vulnerabilities ?? {})) {
+            console.log(JSON.stringify({
+              package: name,
+              severity: advisory.severity,
+              direct: advisory.isDirect,
+              range: advisory.range,
+              fixAvailable: advisory.fixAvailable,
+              via: (advisory.via ?? []).map((entry) => typeof entry === 'string' ? entry : {
+                title: entry.title,
+                url: entry.url,
+                range: entry.range,
+              }),
+            }));
+          }
+          NODE
