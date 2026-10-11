@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Bell, RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSimulation } from '../../store/useSimulation.ts';
 import { formatTimeAgo } from '../../utils/format.ts';
+import { useAuth } from '../../store/AuthContext.tsx';
 
 export function Header({ title, subtitle }: { title: string; subtitle?: string }) {
   const { alerts, running, lastRefresh, refresh } = useSimulation();
+  const { username, logout } = useAuth();
   const open = alerts.filter((a) => a.status === 'open').length;
   const [spinning, setSpinning] = useState(false);
   return (
@@ -37,7 +39,8 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
               <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] grid place-items-center font-bold tabular-nums" style={{ background: 'linear-gradient(135deg,#e11d48,#f43f5e)' }}>{open}</span>
             )}
           </Link>
-          <span className="hidden md:grid place-items-center h-9 w-9 rounded-full text-white text-xs font-extrabold" style={{ background: 'linear-gradient(135deg,#0f766e,#0891b2)' }} aria-hidden>DR</span>
+          <span className="hidden lg:inline max-w-28 truncate text-xs text-slate-500" title={username ?? 'Operator'}>{username ?? 'Operator'}</span>
+          <button type="button" onClick={logout} aria-label="Sign out" title="Sign out" className="icon-btn"><LogOut size={17} aria-hidden /></button>
         </div>
       </div>
     </header>
