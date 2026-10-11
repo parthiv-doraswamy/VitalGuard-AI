@@ -52,6 +52,10 @@ SQLite defaults to `backend/vitalguard_demo.sqlite3`. Set `VITALGUARD_DB_PATH` t
 
 Set `CORS_ORIGINS` to a comma-separated list of exact permitted browser origins. The deployed frontend origin is allowed by default.
 
+## Authentication foundation (Phase 3)
+
+The API has a minimal environment-configured bearer-token flow: `POST /api/v1/auth/login` issues a signed token valid for 15 minutes, and `GET /api/v1/auth/me` validates it. Set `VITALGUARD_AUTH_USERNAME`, `VITALGUARD_AUTH_PASSWORD`, and a random `VITALGUARD_AUTH_SECRET` (at least 32 characters) in private backend environment configuration only. Missing configuration fails closed. This is a single-operator foundation, has no server-side revocation or MFA, and **does not yet protect all application routes**. Keep the deployment synthetic-only; see [Phase 3 authentication notes](../docs/PHASE_3_AUTHENTICATION.md).
+
 ## Tests
 
 ```bash
