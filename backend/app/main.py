@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
+from .validation_diagnostics import evaluate_synthetic_calibration_and_subgroups
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
@@ -98,6 +99,11 @@ def calculate_news2(payload: NEWS2Input, principal: dict = Depends(authenticate_
 @app.get("/api/v1/model/evaluation")
 def model_evaluation(principal: dict = Depends(authenticate_principal)):
     return evaluate_synthetic_holdout()
+
+@app.get("/api/v1/model/validation-diagnostics")
+def model_validation_diagnostics(principal: dict = Depends(authenticate_principal)):
+    """Synthetic-only calibration and age-band diagnostics; never clinical evidence."""
+    return evaluate_synthetic_calibration_and_subgroups()
 
 @app.post("/api/v1/risk/predict", response_model=RiskPrediction)
 async def predict(payload: VitalInput, principal: dict = Depends(authenticate_principal)):
