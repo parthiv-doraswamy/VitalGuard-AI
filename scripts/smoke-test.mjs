@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 const baseUrl = (process.env.VITALGUARD_API_URL || 'https://vitalguard-risk-api.onrender.com').replace(/\/$/, '');
 const timeoutMs = 20_000;
 const coldStartTimeoutMs = 60_000;
+let accessToken = null;
 
 async function request(path, options = {}, timeout = timeoutMs) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -10,6 +11,7 @@ async function request(path, options = {}, timeout = timeoutMs) {
     signal: AbortSignal.timeout(timeout),
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -47,6 +49,19 @@ async function main() {
   assert.equal(health.status, 'ok');
   assert.equal(health.demo_only, true);
   console.log('✓ Health endpoint');
+
+  const username = process.env.VITALGUARD_SMOKE_USERNAME;
+  const password = process.env.VITALGUARD_SMOKE_PASSWORD;
+  assert.ok(username && password, 'Set GitHub Actions secrets VITALGUARD_SMOKE_USERNAME and VITALGUARD_SMOKE_PASSWORD before running the live smoke test.');
+  const { data: login } = await request('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+  assert.ok(login.access_token, 'Login response must contain an access token');
+  assert.equal(login.token_type, 'bearer');
+  assert.ok(login.expires_in > 0 && login.expires_in <= 900);
+  accessToken = login.access_token;
+  console.log('✓ Operator login and short-lived token');
 
   const { data: model } = await request('/api/v1/model/info');
   assert.equal(model.demo_only, true);
@@ -86,7 +101,7 @@ async function main() {
 
   const scale2Denied = await fetch(baseUrl + '/api/v1/scores/news2', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({
       patient_id: 'SMOKE-NEWS2-DENIED', respiratory_rate: 16, spo2: 90,
       systolic_bp: 120, heart_rate: 80, temperature: 37, consciousness: 'alert',
@@ -176,7 +191,7 @@ async function main() {
 
   const invalid = await fetch(`${baseUrl}/api/v1/risk/predict`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({
       patient_id: patientId,
       age: 58,
