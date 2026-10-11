@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 import uuid
-from fastapi import FastAPI, Query, WebSocket, HTTPException
+from fastapi import FastAPI, Query, WebSocket, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
@@ -16,7 +16,7 @@ from .alert_service import create_alert
 from .data_quality import assess_observations
 from .live_events import hub
 from .storage import database_health, initialize_storage, list_observations, save_observation
-from .auth import router as auth_router
+from .auth import router as auth_router, authenticate_principal
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -33,7 +33,7 @@ app.include_router(trend_router)
 _default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://vitalguard-ai-g215.onrender.com"]
 _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
-    allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+    allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -76,23 +76,23 @@ async def live_socket(websocket: WebSocket):
     await hub.serve(websocket)
 
 @app.get("/api/v1/model/info")
-def model_info():
+def model_info(principal: dict = Depends(authenticate_principal)):
     return {"name": "VitalGuard synthetic risk classifier", "model_version": MODEL_VERSION,
         "algorithm": "StandardScaler + LogisticRegression",
         "features": ["age", "heart_rate", "spo2", "systolic_bp", "diastolic_bp", "temperature", "respiratory_rate"],
         "training_data": "generated synthetic observations only", "demo_only": True, "clinically_validated": False}
 
 @app.post("/api/v1/scores/news2")
-def calculate_news2(payload: NEWS2Input):
+def calculate_news2(payload: NEWS2Input, principal: dict = Depends(authenticate_principal)):
     """Calculate parameter points for a fictional NEWS2 example; not clinical guidance."""
     return score_news2(payload.model_dump(exclude={"patient_id", "scale2_authorized"}))
 
 @app.get("/api/v1/model/evaluation")
-def model_evaluation():
+def model_evaluation(principal: dict = Depends(authenticate_principal)):
     return evaluate_synthetic_holdout()
 
 @app.post("/api/v1/risk/predict", response_model=RiskPrediction)
-async def predict(payload: VitalInput):
+async def predict(payload: VitalInput, principal: dict = Depends(authenticate_principal)):
     values = payload.model_dump(exclude={"patient_id"})
     probability = predict_probability(values)
     score = round(probability * 100)
@@ -108,7 +108,7 @@ async def predict(payload: VitalInput):
     return response
 
 @app.post("/api/v1/risk/explain")
-def explain_risk(payload: VitalInput):
+def explain_risk(payload: VitalInput, principal: dict = Depends(authenticate_principal)):
     values = payload.model_dump(exclude={"patient_id"})
     return {"patient_id": payload.patient_id, "model_version": MODEL_VERSION,
         "risk_score": round(predict_probability(values) * 100),
@@ -119,7 +119,7 @@ def explain_risk(payload: VitalInput):
 
 @app.get("/api/v1/observations")
 def observation_history(patient_id: str | None = Query(default=None, min_length=1, max_length=64),
-    limit: int = Query(default=50, ge=1, le=100), before_id: int | None = Query(default=None, ge=1)):
+    limit: int = Query(default=50, ge=1, le=100), before_id: int | None = Query(default=None, ge=1), principal: dict = Depends(authenticate_principal)):
     records = list_observations(patient_id=patient_id, limit=limit, before_id=before_id)
     next_cursor = records[-1]["id"] if len(records) == limit else None
     return {"items": records, "count": len(records), "limit": limit, "next_before_id": next_cursor,
