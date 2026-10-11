@@ -1,15 +1,18 @@
 from fastapi.testclient import TestClient
 import pytest
 from app.main import app
+from auth_helpers import authenticate_test_client
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "live.sqlite3"))
     with TestClient(app) as test_client:
+        authenticate_test_client(test_client)
         yield test_client
 
 def test_websocket_receives_observation_only_after_ingestion(client):
-    with client.websocket_connect("/api/v1/live") as websocket:
+    token = client.headers["Authorization"].split(" ", 1)[1]
+    with client.websocket_connect(f"/api/v1/live?token={token}") as websocket:
         connected = websocket.receive_json()
         assert connected["type"] == "connected"
         response = client.post("/api/v1/demo/observations",
@@ -22,7 +25,8 @@ def test_websocket_receives_observation_only_after_ingestion(client):
         assert event["demo_only"] is True
 
 def test_websocket_heartbeat(client):
-    with client.websocket_connect("/api/v1/live") as websocket:
+    token = client.headers["Authorization"].split(" ", 1)[1]
+    with client.websocket_connect(f"/api/v1/live?token={token}") as websocket:
         assert websocket.receive_json()["type"] == "connected"
         websocket.send_text("ping")
         assert websocket.receive_json()["type"] == "pong"

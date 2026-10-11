@@ -7,21 +7,29 @@ import { AlertsPage } from './pages/AlertsPage.tsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { NotFoundPage } from './pages/NotFoundPage.tsx';
+import { LoginPage } from './pages/LoginPage.tsx';
+import { AuthProvider } from './store/AuthContext.tsx';
+import { ProtectedRoute } from './components/ProtectedRoute.tsx';
 export function App() {
   return (
-    <SimulationProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/patients" element={<PatientsPage />} />
-          <Route path="/patients/:patientId" element={<PatientDetailPage />} />
-          <Route path="/alerts" element={<AlertsPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </BrowserRouter>
-    </SimulationProvider>
+    <AuthProvider>
+      <SimulationProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/patients" element={<PatientsPage />} />
+              <Route path="/patients/:patientId" element={<PatientDetailPage />} />
+              <Route path="/alerts" element={<AlertsPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </SimulationProvider>
+    </AuthProvider>
   );
 }

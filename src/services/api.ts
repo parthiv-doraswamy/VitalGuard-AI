@@ -38,8 +38,28 @@ export interface ObservationHistory {
   demo_only: true;
   disclaimer: string;
 }
+const AUTH_STORAGE_KEY = 'vitalguard.operator.session';
+
+function getAccessToken(): string | null {
+  try {
+    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as { token?: string; expiresAt?: number };
+    if (!session.token || !session.expiresAt || session.expiresAt <= Date.now()) {
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      return null;
+    }
+    return session.token;
+  } catch {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    return null;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
+  const token = getAccessToken();
+  if (token) headers.set('Authorization', 'Bearer ' + token);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(`${APP_CONFIG.apiBaseUrl}${path}`, {
     ...init,

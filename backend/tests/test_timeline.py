@@ -1,11 +1,13 @@
 from fastapi.testclient import TestClient
 from app.main import app
 from app.alert_service import create_alert, transition_alert
+from auth_helpers import authenticate_test_client
 
 
 def test_patient_timeline_combines_persisted_events(tmp_path, monkeypatch):
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "timeline.sqlite3"))
     with TestClient(app) as client:
+        authenticate_test_client(client)
         payload = {
             "patient_id": "DEMO-TIMELINE-001", "age": 58, "heart_rate": 82,
             "spo2": 98, "systolic_bp": 122, "diastolic_bp": 78,
@@ -40,5 +42,6 @@ def test_patient_timeline_combines_persisted_events(tmp_path, monkeypatch):
 
 def test_patient_timeline_limit_is_bounded():
     with TestClient(app) as client:
+        authenticate_test_client(client)
         response = client.get("/api/v1/patients/DEMO-001/timeline?limit=101")
     assert response.status_code == 422

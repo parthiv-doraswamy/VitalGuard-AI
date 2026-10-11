@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from .alert_service import list_alert_audit, list_alerts
 from .storage import list_observations
 from .timeline import build_patient_timeline
+from .auth import authenticate_principal
 
-router = APIRouter(prefix="/api/v1/patients", tags=["patient-timeline"])
+router = APIRouter(prefix="/api/v1/patients", tags=["patient-timeline"], dependencies=[Depends(authenticate_principal)])
 
 @router.get("/{patient_id}/timeline")
 def patient_timeline(patient_id: str, limit: int = Query(default=50, ge=1, le=100)):

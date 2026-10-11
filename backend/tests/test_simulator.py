@@ -1,12 +1,14 @@
 from fastapi.testclient import TestClient
 import pytest
 from app.main import app
+from auth_helpers import authenticate_test_client
 from app.simulator import observation_for_step
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "simulator.sqlite3"))
     with TestClient(app) as test_client:
+        authenticate_test_client(test_client)
         yield test_client
 
 @pytest.mark.parametrize("scenario", ["stable", "worsening", "recovering"])
