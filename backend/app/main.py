@@ -7,6 +7,7 @@ from starlette.requests import Request
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
 from .validation_diagnostics import evaluate_synthetic_calibration_and_subgroups
+from .explanation_validation import validate_additive_explanation
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import router as simulator_router
@@ -129,6 +130,7 @@ def explain_risk(payload: VitalInput, principal: dict = Depends(authenticate_pri
         "contributions": coefficient_contributions(values),
         "method": "standardized logistic-regression coefficient contributions",
         "caveat": "These are model contributions, not causal explanations or clinical guidance.",
+        "reconstruction_check": validate_additive_explanation(values),
         "demo_only": True}
 
 @app.get("/api/v1/observations")
