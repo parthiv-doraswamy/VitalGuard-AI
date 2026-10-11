@@ -17,6 +17,7 @@ from .data_quality import assess_observations
 from .live_events import hub
 from .storage import database_health, initialize_storage, list_observations, save_observation
 from .auth import router as auth_router, authenticate_principal
+from .ingestion_routes import router as ingestion_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -26,6 +27,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(ingestion_router)
 app.include_router(simulator_router)
 app.include_router(alert_router)
 app.include_router(timeline_router)
