@@ -59,6 +59,7 @@ async def add_security_headers(request: Request, call_next):
     elapsed_ms = (time.perf_counter() - started) * 1000
     route = request.scope.get("route")
     route_label = getattr(route, "path", "unmatched")
+    route_label = "/".join("{param}" if segment.startswith("{") and segment.endswith("}") else segment for segment in route_label.split("/"))
     with _metrics_lock:
         _request_count += 1
         _status_counts[str(response.status_code)] += 1
