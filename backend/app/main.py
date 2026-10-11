@@ -72,7 +72,13 @@ def health():
         raise HTTPException(status_code=503, detail="Database health check failed")
 
 @app.websocket("/api/v1/live")
-async def live_socket(websocket: WebSocket):
+async def live_socket(websocket: WebSocket, token: str | None = Query(default=None)):
+    from .auth import validate_access_token
+    try:
+        validate_access_token(token)
+    except HTTPException:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     await hub.serve(websocket)
 
 @app.get("/api/v1/model/info")
@@ -127,6 +133,6 @@ def observation_history(patient_id: str | None = Query(default=None, min_length=
 
 @app.get("/api/v1/observations/quality")
 def observation_quality(stale_after_seconds: int = Query(default=300, ge=30, le=86400),
-    limit: int = Query(default=100, ge=1, le=100)):
+    limit: int = Query(default=100, ge=1, le=100), principal: dict = Depends(authenticate_principal)):
     records = list_observations(limit=limit)
     return assess_observations(records, stale_after_seconds=stale_after_seconds)
