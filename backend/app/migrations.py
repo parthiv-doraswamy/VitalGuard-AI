@@ -5,11 +5,11 @@ new version rather than editing a previously released migration. This remains
 a lightweight SQLAlchemy migration runner; a managed PostgreSQL service and
 backup/restore drill are separate release requirements.
 """
-from sqlalchemy import Column, DateTime, Index, Integer, MetaData, Table, func, insert, select
+from sqlalchemy import Column, DateTime, Integer, MetaData, Table, func, insert, select, text
 from sqlalchemy.engine import Engine
 
 from .storage import _METADATA
-from .storage_schema import alerts, metadata as _EXTENDED_METADATA
+from .storage_schema import metadata as _EXTENDED_METADATA
 
 _MIGRATION_METADATA = MetaData()
 MIGRATIONS = Table(
@@ -21,12 +21,7 @@ MIGRATIONS = Table(
 # Keep migration definitions immutable after release. Each step should be
 # safe to re-run after an interrupted startup.
 LATEST_VERSION = 2
-_ALERT_PATIENT_STATUS_INDEX = Index(
-    "idx_alerts_patient_status_created",
-    alerts.c.patient_id,
-    alerts.c.status,
-    alerts.c.created_at.desc(),
-)
+
 
 
 def _applied_versions(engine: Engine) -> set[int]:
@@ -55,12 +50,14 @@ def migrate(engine: Engine) -> None:
     # checkfirst=True supports both fresh databases and interrupted upgrades.
     applied = _applied_versions(engine)
     if 2 not in applied:
-        _ALERT_PATIENT_STATUS_INDEX.create(engine, checkfirst=True)
+        with engine.begin() as connection:
+            connection.execute(text("CREATE INDEX IF NOT EXISTS idx_alerts_patient_status_created ON alerts (patient_id, status, created_at DESC)"))
         _record_version(engine, 2)
     else:
         # Ensure a partially restored schema is repaired without rewriting the
         # migration ledger.
-        _ALERT_PATIENT_STATUS_INDEX.create(engine, checkfirst=True)
+        with engine.begin() as connection:
+            connection.execute(text("CREATE INDEX IF NOT EXISTS idx_alerts_patient_status_created ON alerts (patient_id, status, created_at DESC)"))
 
     applied = _applied_versions(engine)
     expected = set(range(1, LATEST_VERSION + 1))
