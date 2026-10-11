@@ -134,12 +134,14 @@ async def ingest_batch(batch: IngestionBatch, principal: dict = Depends(authenti
 
     accepted = sum(result["status"] == "accepted" for result in results)
     duplicates = sum(result["status"] == "duplicate" for result in results)
-    rejected = sum(result["status"] == "rejected" for result in results)
+    conflicts = sum(result["status"] == "conflict" for result in results)
+    rejected = sum(result["status"] == "rejected" for result in results) + conflicts
     return {
         "items": results,
         "count": len(results),
         "accepted": accepted,
         "duplicates": duplicates,
+        "conflicts": conflicts,
         "rejected": rejected,
         "demo_only": True,
         "disclaimer": "Synthetic demo ingestion only. No real patient data or clinical use is authorized.",
