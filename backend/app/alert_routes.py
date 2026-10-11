@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from .alert_service import list_alerts, list_alert_audit, transition_alert
 from .auth import authenticate_principal
+from .escalation_policy import evaluate_escalation
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"], dependencies=[Depends(authenticate_principal)])
 
@@ -18,6 +19,22 @@ def get_alerts(status: Literal["open", "acknowledged", "resolved"] | None = None
     return {"items": list_alerts(status=status, patient_id=patient_id, limit=limit),
             "count": len(list_alerts(status=status, patient_id=patient_id, limit=limit)),
             "demo_only": True}
+
+@router.get("/escalation-preview")
+def get_escalation_preview(limit: int = Query(default=100, ge=1, le=100)):
+    """Preview overdue synthetic alerts; this endpoint never sends notifications."""
+    items = list_alerts(status="open", limit=limit)
+    previews = [evaluate_escalation(item) for item in items]
+    due = [item for item in previews if item["review_due"]]
+    return {
+        "items": previews,
+        "count": len(previews),
+        "due_count": len(due),
+        "policy_version": previews[0]["policy_version"] if previews else "demo-escalation-policy-0.1.0",
+        "demo_only": True,
+        "notifications_sent": False,
+        "clinical_policy": False,
+    }
 
 @router.post("/{alert_id}/acknowledge")
 def acknowledge_alert(alert_id: int, payload: AlertAction, principal: dict = Depends(authenticate_principal)):
