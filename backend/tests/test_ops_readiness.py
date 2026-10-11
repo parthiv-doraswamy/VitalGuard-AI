@@ -35,7 +35,7 @@ def test_readiness_requires_authentication(tmp_path, monkeypatch):
 
 
 def test_readiness_reports_missing_auth_configuration(client, monkeypatch):
-    monkeypatch.delenv("VITALGUARD_AUTH_SECRET", raising=False)
+    monkeypatch.delenv("VITALGUARD_AUTH_USERNAME", raising=False)
     response = client.get("/api/v1/ops/readiness")
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
