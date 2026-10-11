@@ -3,11 +3,13 @@ import { Bell, RefreshCw, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSimulation } from '../../store/useSimulation.ts';
 import { formatTimeAgo } from '../../utils/format.ts';
-import { useAuth } from '../../store/AuthContext.tsx';
+import { useOptionalAuth } from '../../store/AuthContext.tsx';
 
 export function Header({ title, subtitle }: { title: string; subtitle?: string }) {
   const { alerts, running, lastRefresh, refresh } = useSimulation();
-  const { username, logout } = useAuth();
+  const auth = useOptionalAuth();
+  const username = auth?.username ?? null;
+  const logout = auth?.logout ?? (() => {});
   const open = alerts.filter((a) => a.status === 'open').length;
   const [spinning, setSpinning] = useState(false);
   return (
