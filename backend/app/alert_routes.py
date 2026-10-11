@@ -1,10 +1,10 @@
 """HTTP endpoints for synthetic demo alert lifecycle."""
 from typing import Literal
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, ConfigDict, Field
-from .alert_service import list_alerts, list_alert_audit, transition_alert
+from .alert_service import list_alerts, list_alert_audit, transition_alert\nfrom .auth import authenticate_principal
 
-router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
+router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"], dependencies=[Depends(authenticate_principal)])
 
 class AlertAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
