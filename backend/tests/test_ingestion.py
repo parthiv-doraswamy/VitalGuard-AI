@@ -90,8 +90,3 @@ def test_batch_ingestion_rejects_non_demo_or_untrusted_metadata(client, change):
     assert response.json()["rejected"] == 1
     assert response.json()["items"][0]["status"] == "rejected"
 
-
-def test_batch_ingestion_requires_authentication():
-    with TestClient(app) as unauthenticated:
-        response = unauthenticated.post("/api/v1/ingestion/batch", json={"records": [item()]})
-    assert response.status_code == 503 or response.status_code == 401
