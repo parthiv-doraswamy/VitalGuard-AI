@@ -34,9 +34,9 @@ def test_readiness_requires_authentication(tmp_path, monkeypatch):
     assert response.status_code == 401
 
 
-def test_readiness_reports_missing_auth_configuration(client, monkeypatch):
+def test_readiness_fails_closed_when_auth_configuration_is_removed(client, monkeypatch):
+    # The endpoint is authenticated; once its auth configuration disappears,
+    # the auth dependency must fail closed before readiness details are exposed.
     monkeypatch.delenv("VITALGUARD_AUTH_USERNAME", raising=False)
     response = client.get("/api/v1/ops/readiness")
-    assert response.status_code == 200
-    assert response.json()["status"] == "degraded"
-    assert response.json()["checks"]["operator_auth_configured"] is False
+    assert response.status_code == 503
