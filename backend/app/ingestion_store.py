@@ -1,6 +1,7 @@
 """Transactional persistence for validated demo ingestion records."""
 from __future__ import annotations
 
+import json
 from sqlalchemy import insert, select
 from sqlalchemy.exc import IntegrityError
 
@@ -9,17 +10,11 @@ from .storage import _OBSERVATIONS, _engine
 
 
 def persist_ingested_observation(
-    *,
-    source_system: str,
-    source_event_id: str,
-    patient_id: str,
-    observed_at,
-    units: dict[str, str],
-    payload_hash: str,
-    inputs: dict,
-    prediction: dict,
+    *, source_system: str, source_event_id: str, patient_id: str,
+    observed_at, units: dict[str, str], payload_hash: str,
+    inputs: dict, prediction: dict,
 ) -> dict:
-    """Persist observation and provenance together, with source-event idempotency."""
+    """Persist observation and provenance together with source-event idempotency."""
     engine = _engine()
     try:
         try:
@@ -32,15 +27,15 @@ def persist_ingested_observation(
                 ).mappings().first()
                 if existing:
                     return {
-                        "status": "duplicate",
+                        "status": "duplicate" if existing["payload_hash"] == payload_hash else "conflict",
                         "observation_id": existing["observation_id"],
                         "ingestion_id": existing["id"],
                     }
 
                 observation_result = connection.execute(insert(_OBSERVATIONS).values(
                     patient_id=patient_id,
-                    input_json=__import__("json").dumps(inputs, separators=(",", ":")),
-                    prediction_json=__import__("json").dumps(prediction, separators=(",", ":")),
+                    input_json=json.dumps(inputs, separators=(",", ":")),
+                    prediction_json=json.dumps(prediction, separators=(",", ":")),
                     model_version=prediction["model_version"],
                 ))
                 observation_id = observation_result.inserted_primary_key[0]
@@ -50,7 +45,7 @@ def persist_ingested_observation(
                     patient_id=patient_id,
                     observed_at=observed_at,
                     observation_id=observation_id,
-                    units_json=__import__("json").dumps(units, separators=(",", ":"), sort_keys=True),
+                    units_json=json.dumps(units, separators=(",", ":"), sort_keys=True),
                     payload_hash=payload_hash,
                 ))
                 return {
@@ -69,7 +64,7 @@ def persist_ingested_observation(
                 ).mappings().first()
             if existing:
                 return {
-                    "status": "duplicate",
+                    "status": "duplicate" if existing["payload_hash"] == payload_hash else "conflict",
                     "observation_id": existing["observation_id"],
                     "ingestion_id": existing["id"],
                 }

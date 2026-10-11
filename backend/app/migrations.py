@@ -10,6 +10,7 @@ from sqlalchemy.engine import Engine
 
 from .storage import _METADATA
 from .storage_schema import metadata as _EXTENDED_METADATA
+from .ingestion_schema import metadata as _INGESTION_METADATA
 
 _MIGRATION_METADATA = MetaData()
 MIGRATIONS = Table(
@@ -20,7 +21,7 @@ MIGRATIONS = Table(
 
 # Keep migration definitions immutable after release. Each step should be
 # safe to re-run after an interrupted startup.
-LATEST_VERSION = 2
+LATEST_VERSION = 3
 
 
 
@@ -58,6 +59,15 @@ def migrate(engine: Engine) -> None:
         # migration ledger.
         with engine.begin() as connection:
             connection.execute(text("CREATE INDEX IF NOT EXISTS idx_alerts_patient_status_created ON alerts (patient_id, status, created_at DESC)"))
+
+    # Version 3: source provenance, observed timestamps, units and idempotency ledger.
+    applied = _applied_versions(engine)
+    if 3 not in applied:
+        _INGESTION_METADATA.create_all(engine)
+        _record_version(engine, 3)
+    else:
+        # Repair a missing table after an interrupted restore without rewriting the ledger.
+        _INGESTION_METADATA.create_all(engine)
 
     applied = _applied_versions(engine)
     expected = set(range(1, LATEST_VERSION + 1))
