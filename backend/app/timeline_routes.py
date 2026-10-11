@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query, Depends
 from .alert_service import list_alert_audit, list_alerts
 from .storage import list_observations
-from .timeline import build_patient_timeline\nfrom .auth import authenticate_principal
+from .timeline import build_patient_timeline
+from .auth import authenticate_principal
 
 router = APIRouter(prefix="/api/v1/patients", tags=["patient-timeline"], dependencies=[Depends(authenticate_principal)])
 
