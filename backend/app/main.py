@@ -25,7 +25,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
-app.include_router(auth_router)\napp.include_router(simulator_router)
+app.include_router(auth_router)
+app.include_router(simulator_router)
 app.include_router(alert_router)
 app.include_router(timeline_router)
 app.include_router(trend_router)
