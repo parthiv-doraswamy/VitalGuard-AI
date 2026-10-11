@@ -1,12 +1,14 @@
 from fastapi.testclient import TestClient
 import pytest
 from app.main import app
+from auth_helpers import authenticate_test_client
 from app.alert_service import create_alert
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "alerts.sqlite3"))
     with TestClient(app) as test_client:
+        authenticate_test_client(test_client)
         yield test_client
 
 def seed_alert():
@@ -27,7 +29,7 @@ def test_acknowledge_resolve_and_audit(client):
     ack = client.post(f"/api/v1/alerts/{alert_id}/acknowledge", json={"actor": "demo-nurse"})
     assert ack.status_code == 200
     assert ack.json()["item"]["status"] == "acknowledged"
-    assert ack.json()["item"]["acknowledged_by"] == "demo-nurse"
+    assert ack.json()["item"]["acknowledged_by"] == "demo-operator"
 
     resolved = client.post(f"/api/v1/alerts/{alert_id}/resolve", json={"actor": "demo-nurse"})
     assert resolved.status_code == 200
