@@ -30,6 +30,13 @@ The Phase 8 temporal feature builder and subject-grouped baseline-versus-candida
 - Use fixed seeds and record the feature set, model version, split method and label-generation rule.
 - Do not choose a threshold based on the holdout set. Threshold selection belongs to training/validation data and must be frozen before final testing.
 
+### Implemented synthetic diagnostics
+
+- Authenticated endpoint: `GET /api/v1/model/validation-diagnostics`.
+- Reports Brier score, five calibration bins with counts and observed positive fractions, ROC-AUC, and age-band precision/recall with sample and positive-label counts.
+- Uses a fixed subject-disjoint synthetic holdout; unavailable subgroup metrics include a reason when the sample is too small or only one label class is present.
+- The fixed 0.5 threshold is a demo convention, not a selected or approved clinical threshold. This endpoint is a software diagnostic and does not alter the serving model.
+
 ### Layer C — Independent clinical validation (not possible from this repository alone)
 
 Requires an approved intended use, prespecified outcome and prediction horizon, lawful and governed data access, representative patient-level data, independent site/time-based test cohort, clinician-adjudicated outcomes, subgroup analysis, calibration assessment, prospective workflow evaluation, safety monitoring and independent clinical/statistical review. This phase cannot fabricate these inputs or substitute synthetic metrics for them.
