@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.ts';
+import { getOperatorAccessToken, authorizedFetch } from './authenticatedFetch.ts';
 import type { ObservationHistory } from './api.ts';
 
 export interface LiveObservationEvent {
@@ -31,7 +32,12 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
     const base = APP_CONFIG.apiBaseUrl;
     const wsBase = base.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
     try {
-      socket = new WebSocket(`${wsBase}/api/v1/live`);
+      const token = getOperatorAccessToken();
+      if (!token) {
+        onStatus('offline');
+        return;
+      }
+      socket = new WebSocket(`${wsBase}/api/v1/live?token=${encodeURIComponent(token)}`);
     } catch {
       scheduleRetry();
       return;
@@ -77,7 +83,7 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
 }
 
 export async function reconcileObservationHistory(): Promise<ObservationHistory> {
-  const response = await fetch(`${APP_CONFIG.apiBaseUrl}/api/v1/observations?limit=100`, {
+  const response = await authorizedFetch(`${APP_CONFIG.apiBaseUrl}/api/v1/observations?limit=100`, {
     signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error(`History reconciliation failed (${response.status})`);
