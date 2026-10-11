@@ -130,3 +130,53 @@ def test_api_returns_baseline_security_headers_and_request_id(client):
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-request-id"]
     assert len(response.headers["x-request-id"]) == 36
+
+
+def test_auth_login_fails_closed_when_not_configured(client, monkeypatch):
+    monkeypatch.delenv("VITALGUARD_AUTH_USERNAME", raising=False)
+    monkeypatch.delenv("VITALGUARD_AUTH_PASSWORD", raising=False)
+    monkeypatch.delenv("VITALGUARD_AUTH_SECRET", raising=False)
+    response = client.post("/api/v1/auth/login", json={"username": "demo", "password": "secret"})
+    assert response.status_code == 503
+
+
+def test_auth_login_and_identity_round_trip(client, monkeypatch):
+    monkeypatch.setenv("VITALGUARD_AUTH_USERNAME", "demo-operator")
+    monkeypatch.setenv("VITALGUARD_AUTH_PASSWORD", "a-long-demo-password")
+    monkeypatch.setenv("VITALGUARD_AUTH_SECRET", "test-only-secret-that-is-at-least-32-chars")
+    login = client.post("/api/v1/auth/login", json={
+        "username": "demo-operator", "password": "a-long-demo-password"
+    })
+    assert login.status_code == 200
+    body = login.json()
+    assert body["token_type"] == "bearer"
+    assert body["expires_in"] == 900
+    identity = client.get("/api/v1/auth/me", headers={
+        "Authorization": f"Bearer {body['access_token']}"
+    })
+    assert identity.status_code == 200
+    assert identity.json() == {"subject": "demo-operator", "authenticated": True}
+
+
+def test_auth_rejects_invalid_credentials_and_tokens(client, monkeypatch):
+    monkeypatch.setenv("VITALGUARD_AUTH_USERNAME", "demo-operator")
+    monkeypatch.setenv("VITALGUARD_AUTH_PASSWORD", "a-long-demo-password")
+    monkeypatch.setenv("VITALGUARD_AUTH_SECRET", "test-only-secret-that-is-at-least-32-chars")
+    bad_login = client.post("/api/v1/auth/login", json={
+        "username": "demo-operator", "password": "wrong-password"
+    })
+    assert bad_login.status_code == 401
+    missing = client.get("/api/v1/auth/me")
+    assert missing.status_code == 401
+    invalid = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer forged-token"})
+    assert invalid.status_code == 401
+
+
+def test_auth_login_rejects_unknown_fields(client, monkeypatch):
+    monkeypatch.setenv("VITALGUARD_AUTH_USERNAME", "demo-operator")
+    monkeypatch.setenv("VITALGUARD_AUTH_PASSWORD", "a-long-demo-password")
+    monkeypatch.setenv("VITALGUARD_AUTH_SECRET", "test-only-secret-that-is-at-least-32-chars")
+    response = client.post("/api/v1/auth/login", json={
+        "username": "demo-operator", "password": "a-long-demo-password", "role": "admin"
+    })
+    assert response.status_code == 422
