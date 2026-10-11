@@ -46,18 +46,14 @@ def _serializer(secret: str) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret_key=secret, salt="vitalguard-access-v1")
 
 
-def authenticate_principal(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> dict[str, str]:
-    """Validate an access token and return its authenticated subject."""
+def validate_access_token(token: str | None) -> dict[str, str]:
+    """Validate a bearer token supplied by HTTP or a WebSocket handshake."""
     _, _, secret = _credentials()
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    if not token:
         raise HTTPException(status_code=401, detail="Bearer token required",
                             headers={"WWW-Authenticate": "Bearer"})
     try:
-        payload = _serializer(secret).loads(
-            credentials.credentials, max_age=ACCESS_TOKEN_TTL_SECONDS
-        )
+        payload = _serializer(secret).loads(token, max_age=ACCESS_TOKEN_TTL_SECONDS)
     except SignatureExpired:
         raise HTTPException(status_code=401, detail="Access token expired",
                             headers={"WWW-Authenticate": "Bearer"})
@@ -72,6 +68,16 @@ def authenticate_principal(
         raise HTTPException(status_code=401, detail="Account is no longer valid",
                             headers={"WWW-Authenticate": "Bearer"})
     return {"sub": payload["sub"]}
+
+
+def authenticate_principal(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> dict[str, str]:
+    """Validate an access token and return its authenticated subject."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Bearer token required",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return validate_access_token(credentials.credentials)
 
 
 @router.post("/login", response_model=TokenResponse)
