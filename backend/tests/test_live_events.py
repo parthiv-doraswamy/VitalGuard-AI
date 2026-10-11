@@ -25,7 +25,8 @@ def test_websocket_receives_observation_only_after_ingestion(client):
         assert event["demo_only"] is True
 
 def test_websocket_heartbeat(client):
-    with client.websocket_connect("/api/v1/live") as websocket:
+    token = client.headers["Authorization"].split(" ", 1)[1]
+    with client.websocket_connect(f"/api/v1/live?token={token}") as websocket:
         assert websocket.receive_json()["type"] == "connected"
         websocket.send_text("ping")
         assert websocket.receive_json()["type"] == "pong"
