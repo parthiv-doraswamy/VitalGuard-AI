@@ -75,6 +75,38 @@ def health():
     except Exception:
         raise HTTPException(status_code=503, detail="Database health check failed")
 
+@app.get("/api/v1/ops/readiness")
+def operational_readiness(principal: dict = Depends(authenticate_principal)):
+    """Authenticated, secret-free operational readiness snapshot for the demo."""
+    try:
+        database = database_health()
+        database_status = "ok"
+    except Exception:
+        database = {"status": "unavailable"}
+        database_status = "unavailable"
+    auth_configured = all(os.getenv(name, "").strip() for name in (
+        "VITALGUARD_AUTH_USERNAME", "VITALGUARD_AUTH_PASSWORD", "VITALGUARD_AUTH_SECRET"
+    ))
+    ready = database_status == "ok" and auth_configured
+    return {
+        "status": "ready" if ready else "degraded",
+        "checks": {
+            "database": database_status,
+            "operator_auth_configured": auth_configured,
+            "model_loaded": True,
+            "websocket_transport": "process_local_best_effort",
+        },
+        "database_backend": database.get("backend", "unknown"),
+        "model_version": MODEL_VERSION,
+        "demo_only": True,
+        "clinically_validated": False,
+        "notes": [
+            "Synthetic demo only; no clinical-use readiness is implied.",
+            "WebSocket fan-out is process-local and best-effort.",
+        ],
+    }
+
+
 @app.websocket("/api/v1/live")
 async def live_socket(websocket: WebSocket, token: str | None = Query(default=None)):
     from .auth import validate_access_token
