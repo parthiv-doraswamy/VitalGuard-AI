@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
+import { authorizedFetch } from '../../services/authenticatedFetch.ts';
 
 type QualityItem = {
   patient_id: string;
@@ -32,7 +33,7 @@ export function DataQualityPanel() {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch(`${APP_CONFIG.apiBaseUrl}/api/v1/observations/quality?stale_after_seconds=300&limit=100`, {
+      const response = await authorizedFetch(`${APP_CONFIG.apiBaseUrl}/api/v1/observations/quality?stale_after_seconds=300&limit=100`, {
         signal: AbortSignal.timeout(8000),
       });
       if (!response.ok) throw new Error(`API returned ${response.status}`);
