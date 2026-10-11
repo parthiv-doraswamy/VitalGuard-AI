@@ -6,7 +6,8 @@ from .live_events import hub
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .schemas import RiskPrediction
 from .simulator import observation_for_step
-from .storage import save_observation\nfrom .auth import authenticate_principal
+from .storage import save_observation
+from .auth import authenticate_principal
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo-simulator"], dependencies=[Depends(authenticate_principal)])
 
