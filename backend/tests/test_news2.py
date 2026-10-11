@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.news2 import score_news2
+from auth_helpers import authenticate_test_client
 
 
 def baseline(**updates):
@@ -67,12 +68,14 @@ def test_scale_2_air_and_oxygen_ranges():
 
 def test_api_rejects_scale_2_without_authorization():
     with TestClient(app) as client:
+        authenticate_test_client(client)
         response = client.post("/api/v1/scores/news2", json=baseline(spo2_scale=2))
     assert response.status_code == 422
 
 
 def test_api_returns_total_and_demo_disclaimer():
     with TestClient(app) as client:
+        authenticate_test_client(client)
         response = client.post("/api/v1/scores/news2", json=baseline())
     assert response.status_code == 200
     body = response.json()
