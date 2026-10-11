@@ -5,4 +5,4 @@ numpy==2.5.3
 pytest==9.1.1
 httpx==0.28.1
 SQLAlchemy==2.1.4
-psycopg[binary]==3.3.6
+psycopg[binary]==3.3.6\nitsdangerous==2.2.0\n
