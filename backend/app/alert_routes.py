@@ -2,7 +2,8 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, ConfigDict, Field
-from .alert_service import list_alerts, list_alert_audit, transition_alert\nfrom .auth import authenticate_principal
+from .alert_service import list_alerts, list_alert_audit, transition_alert
+from .auth import authenticate_principal
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"], dependencies=[Depends(authenticate_principal)])
 
@@ -19,15 +20,15 @@ def get_alerts(status: Literal["open", "acknowledged", "resolved"] | None = None
             "demo_only": True}
 
 @router.post("/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: int, payload: AlertAction):
-    result = transition_alert(alert_id, "acknowledge", payload.actor)
+def acknowledge_alert(alert_id: int, payload: AlertAction, principal: dict = Depends(authenticate_principal)):
+    result = transition_alert(alert_id, "acknowledge", principal["sub"])
     if result is None:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"item": result, "demo_only": True}
 
 @router.post("/{alert_id}/resolve")
-def resolve_alert(alert_id: int, payload: AlertAction):
-    result = transition_alert(alert_id, "resolve", payload.actor)
+def resolve_alert(alert_id: int, payload: AlertAction, principal: dict = Depends(authenticate_principal)):
+    result = transition_alert(alert_id, "resolve", principal["sub"])
     if result is None:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"item": result, "demo_only": True}
