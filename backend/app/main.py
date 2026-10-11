@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 import os
 import uuid
+import threading
+import time
+from collections import Counter
 from fastapi import FastAPI, Query, WebSocket, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -39,10 +42,29 @@ _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
 app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
     allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
+# Process-local operational counters. Never store query strings, patient IDs, or request bodies.
+_metrics_lock = threading.Lock()
+_request_count = 0
+_status_counts: Counter[str] = Counter()
+_route_counts: Counter[str] = Counter()
+_latency_total_ms = 0.0
+_latency_max_ms = 0.0
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    """Attach baseline response headers and a server-generated request ID."""
+    """Record privacy-safe process metrics and attach baseline security headers."""
+    global _request_count, _latency_total_ms, _latency_max_ms
+    started = time.perf_counter()
     response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    route = request.scope.get("route")
+    route_label = getattr(route, "path", "unmatched")
+    with _metrics_lock:
+        _request_count += 1
+        _status_counts[str(response.status_code)] += 1
+        _route_counts[route_label] += 1
+        _latency_total_ms += elapsed_ms
+        _latency_max_ms = max(_latency_max_ms, elapsed_ms)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -105,6 +127,26 @@ def operational_readiness(principal: dict = Depends(authenticate_principal)):
             "WebSocket fan-out is process-local and best-effort.",
         ],
     }
+
+
+@app.get("/api/v1/ops/metrics")
+def operational_metrics(principal: dict = Depends(authenticate_principal)):
+    """Return bounded-cardinality, process-local metrics without request data."""
+    with _metrics_lock:
+        count = _request_count
+        return {
+            "request_count": count,
+            "status_counts": dict(_status_counts),
+            "route_counts": dict(_route_counts),
+            "latency_ms": {
+                "count": count,
+                "mean": round(_latency_total_ms / count, 2) if count else 0.0,
+                "max": round(_latency_max_ms, 2),
+            },
+            "scope": "current_process_since_startup",
+            "demo_only": True,
+            "note": "Process-local counters reset on restart and are not a durable monitoring system.",
+        }
 
 
 @app.websocket("/api/v1/live")
