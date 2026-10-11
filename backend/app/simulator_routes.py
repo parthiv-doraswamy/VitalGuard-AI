@@ -1,14 +1,14 @@
 """Demo-only API for submitting deterministic synthetic observations."""
 from typing import Literal
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from .live_events import hub
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
 from .schemas import RiskPrediction
 from .simulator import observation_for_step
-from .storage import save_observation
+from .storage import save_observation\nfrom .auth import authenticate_principal
 
-router = APIRouter(prefix="/api/v1/demo", tags=["demo-simulator"])
+router = APIRouter(prefix="/api/v1/demo", tags=["demo-simulator"], dependencies=[Depends(authenticate_principal)])
 
 class SimulationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
