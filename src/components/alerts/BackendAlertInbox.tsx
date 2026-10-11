@@ -76,13 +76,17 @@ export function BackendAlertInbox() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [result, preview] = await Promise.all([
-        apiRequest<AlertResponse>('/api/v1/alerts?limit=100'),
-        apiRequest<EscalationPreview>('/api/v1/alerts/escalation-preview?limit=100'),
-      ]);
+      const result = await apiRequest<AlertResponse>('/api/v1/alerts?limit=100');
       setItems(result.items);
-      setEscalation(preview);
-      setError('');
+      try {
+        const preview = await apiRequest<EscalationPreview>('/api/v1/alerts/escalation-preview?limit=100');
+        setEscalation(preview);
+        setError('');
+      } catch {
+        // Keep the core inbox usable when an older backend lacks this optional endpoint.
+        setEscalation(null);
+        setError('Alert inbox loaded, but the review-deadline preview is unavailable until the latest backend is deployed.');
+      }
     } catch {
       setError('Backend alert service is unavailable. Check the API deployment and database health.');
     } finally {
