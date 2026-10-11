@@ -37,7 +37,7 @@ def test_v1_database_upgrades_to_v2_idempotently(tmp_path):
         migrate(engine)
         with engine.connect() as connection:
             versions = connection.execute(select(MIGRATIONS.c.version).order_by(MIGRATIONS.c.version)).scalars().all()
-        assert versions == [1, 2]
+        assert versions == [1, 2, 3]
         index_names = {item["name"] for item in inspect(engine).get_indexes("alerts")}
         assert "idx_alerts_patient_status_created" in index_names
     finally:
