@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, Depends
 from .storage import list_observations
-from .trends import summarize_observation_trends\nfrom .auth import authenticate_principal
+from .trends import summarize_observation_trends
+from .auth import authenticate_principal
 
 router = APIRouter(prefix="/api/v1/observations", tags=["observation-trends"], dependencies=[Depends(authenticate_principal)])
 
