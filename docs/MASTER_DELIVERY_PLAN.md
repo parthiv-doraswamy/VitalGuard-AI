@@ -1,7 +1,7 @@
 # VitalGuard AI — Master Delivery Plan
 
 **Last updated:** 2026-10-11  
-**Current delivery phase:** Phase 2 complete — architecture, API contracts and data model documented  
+**Current delivery phase:** Phase 5 in progress — versioned database migration implementation  
 **Current system status:** Synthetic-data prototype; not approved for clinical use.
 
 ## Delivery rule
@@ -57,8 +57,8 @@ A phase is not done until its exit evidence is recorded in the repository. A pro
 - Existing feature roadmap: [REALTIME_DEMO_ROADMAP.md](REALTIME_DEMO_ROADMAP.md).
 - Release runbook: [RENDER_RELEASE_RUNBOOK.md](RENDER_RELEASE_RUNBOOK.md).
 - The model is synthetic-data LogisticRegression and is not clinically validated.
-- Hosted PostgreSQL configuration and live end-to-end smoke results remain unverified.
-- Authentication and server-side authorization are not established in the inspected backend.
+- Hosted PostgreSQL configuration, persistence-after-redeploy, and backup/restore evidence remain unverified.
+- Phase 3/4 code is merged to `main` and `phase-3-risk-engine`; backend CI passed and Render reports the authorization commit live. Full browser-to-live API verification is still pending, and operator auth environment variables must be configured privately.
 - The WebSocket event hub is in-process/single-instance; some frontend data remains synthetic fixture data.
 - No real patient data is authorized for the current public demo.
 
@@ -73,3 +73,20 @@ A phase is not done until its exit evidence is recorded in the repository. A pro
 ## Data and clinical safety boundary
 
 Historical research data is not a live feed. Live data must come from an authorized, governed source with secure identity, provenance, validation and monitoring. Do not enter identifiable patient data into the current deployment. Missing or stale observations must not be interpreted as normal. This plan does not itself confer clinical approval.
+
+
+## Phase 3–4 status (2026-10-11)
+
+- Phase 4 authorization PR #46 merged into `phase-3-risk-engine` as `c1eceda2d664f8a45fcb0d68ed46a3768e9c27d1`; backend and frontend CI passed on the final authorization branch commit.
+- Main branch synchronization PR #49 merged as `872759be6d868d512ea36fb2f5b633e937838190`; frontend login PR #47 and the E2E login follow-up PR #50 are also merged.
+- Render frontend is live on main commit `6edd0243a5c1a473c9e93e81274f1e18f578f8a4` before the E2E follow-up deploy; the follow-up commit is expected to deploy via the next frontend release.
+- Render backend deployment for `c1eceda2d664f8a45fcb0d68ed46a3768e9c27d1` reported live on 2026-10-11. Startup logs show the FastAPI application started successfully.
+- The login endpoint intentionally returns 503 until `VITALGUARD_AUTH_USERNAME`, `VITALGUARD_AUTH_PASSWORD`, and a 32+ character `VITALGUARD_AUTH_SECRET` are configured privately in Render. Do not send secrets through chat or commit them.
+- Authorization is a single configured operator identity, not a managed identity provider or role-based access system. The WebSocket browser token currently travels in the query string; replace this before production because query strings can be logged.
+- The application remains synthetic-only. No real patient data or clinical use is approved.
+
+## Phase 5 status
+
+- PR #48 merged into `phase-3-risk-engine` as `92d326153ccbc620a00878d45e2cf6b0a74b73a5`.
+- Migration v2 adds `idx_alerts_patient_status_created`; tests verify fresh initialization, repeat application, and upgrade from schema migration v1. CI passed on the phase-5 migration PR.
+- A managed PostgreSQL instance has not been provisioned or verified. Provisioning may incur cost and requires owner confirmation; keep `DATABASE_URL` private. Persistence, backup and restore checks remain exit criteria.
