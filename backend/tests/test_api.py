@@ -174,7 +174,8 @@ def test_auth_rejects_invalid_credentials_and_tokens(client, monkeypatch):
         "username": "demo-operator", "password": "wrong-password"
     })
     assert bad_login.status_code == 401
-    missing = client.get("/api/v1/auth/me", headers={})
+    client.headers.pop("Authorization", None)
+    missing = client.get("/api/v1/auth/me")
     assert missing.status_code == 401
     invalid = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer forged-token"})
     assert invalid.status_code == 401
@@ -192,6 +193,7 @@ def test_auth_login_rejects_unknown_fields(client, monkeypatch):
 
 
 def test_protected_routes_reject_requests_without_bearer_token(client):
+    client.headers.pop("Authorization", None)
     for method, path, kwargs in [
         ("get", "/api/v1/model/info", {}),
         ("get", "/api/v1/observations", {}),
