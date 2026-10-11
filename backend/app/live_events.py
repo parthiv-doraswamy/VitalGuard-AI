@@ -1,17 +1,24 @@
 """In-process WebSocket fan-out for the single-instance synthetic demo."""
 from __future__ import annotations
+
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 
-class LiveEventHub:
-    """Broadcast persisted demo events to currently connected dashboard clients.
 
-    Events are persisted before broadcast. This in-memory hub is intentionally
-    single-process; reconnect recovery uses the REST history endpoint.
+class LiveEventHub:
+    """Broadcast persisted demo events to connected dashboard clients.
+
+    Events are persisted before broadcast. The hub is intentionally
+    single-process; reconnect recovery uses REST history. A slow/broken client
+    is removed instead of holding up delivery to all other clients.
     """
-    def __init__(self) -> None:
+
+    def __init__(self, send_timeout_seconds: float = 2.0) -> None:
+        if send_timeout_seconds <= 0:
+            raise ValueError("send_timeout_seconds must be positive")
         self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        self._send_timeout_seconds = send_timeout_seconds
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -29,8 +36,10 @@ class LiveEventHub:
         stale = []
         for client in clients:
             try:
-                await client.send_json(event)
-            except Exception:
+                await asyncio.wait_for(
+                    client.send_json(event), timeout=self._send_timeout_seconds
+                )
+            except (Exception, asyncio.TimeoutError):
                 stale.append(client)
         if stale:
             async with self._lock:
@@ -49,5 +58,6 @@ class LiveEventHub:
             await self.disconnect(websocket)
         except Exception:
             await self.disconnect(websocket)
+
 
 hub = LiveEventHub()
