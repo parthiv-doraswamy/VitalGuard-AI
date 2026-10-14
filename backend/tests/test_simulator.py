@@ -42,3 +42,41 @@ def test_ingestion_rejects_invalid_requests(client):
     invalid = client.post("/api/v1/demo/observations",
         json={"scenario": "unknown", "step": -1})
     assert unknown.status_code == 422 and invalid.status_code == 422
+
+
+def test_elevated_simulator_observation_creates_alert_and_audit(client, monkeypatch):
+    # Force a deterministic high demo score so the test checks workflow wiring,
+    # not the synthetic model's chosen parameters or clinical meaning.
+    import app.simulator_routes as simulator_routes
+    monkeypatch.setattr(simulator_routes, "predict_probability", lambda _values: 0.90)
+
+    response = client.post("/api/v1/demo/observations", json={
+        "patient_id": "DEMO-ALERT-001", "scenario": "worsening", "step": 3,
+    })
+    assert response.status_code == 200
+    prediction = response.json()
+    assert prediction["risk_score"] == 90
+
+    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-ALERT-001"})
+    assert alerts.status_code == 200
+    assert alerts.json()["count"] == 1
+    alert = alerts.json()["items"][0]
+    assert alert["status"] == "open"
+    assert alert["details"]["observation_id"] == prediction["observation_id"]
+
+    audit = client.get(f"/api/v1/alerts/{alert['id']}/audit")
+    assert audit.status_code == 200
+    assert any(event["action"] == "created" for event in audit.json()["items"])
+
+
+def test_low_simulator_observation_does_not_create_alert(client, monkeypatch):
+    import app.simulator_routes as simulator_routes
+    monkeypatch.setattr(simulator_routes, "predict_probability", lambda _values: 0.10)
+
+    response = client.post("/api/v1/demo/observations", json={
+        "patient_id": "DEMO-LOW-001", "scenario": "stable", "step": 0,
+    })
+    assert response.status_code == 200
+    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-LOW-001"})
+    assert alerts.status_code == 200
+    assert alerts.json()["count"] == 0
