@@ -72,6 +72,14 @@ def get_alert(alert_id: int) -> dict | None:
     return _serialize(row) if row else None
 
 
+def list_alerts_by_event_keys(event_keys: list[str]) -> list[dict]:
+    if not event_keys:
+        return []
+    with get_engine().connect() as connection:
+        rows = connection.execute(select(alerts).where(alerts.c.event_key.in_(event_keys))).mappings().all()
+    return [_serialize(row) for row in rows]
+
+
 def list_alerts(status: str | None = None, patient_id: str | None = None, limit: int = 50,
                 before_id: int | None = None) -> list[dict]:
     query = select(alerts)

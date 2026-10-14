@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, cast, func, insert, inspect, select, text, update
 from sqlalchemy.engine import Connection, Engine
 
-from .storage_schema import alerts, audit_events, metadata as _APP_METADATA
+from .storage_schema import alerts, audit_events, metadata as _APP_METADATA, stream_sessions
 
 _MIGRATION_METADATA = MetaData()
 MIGRATIONS = Table(
@@ -29,11 +29,17 @@ def _baseline_tables(connection: Connection) -> None:
     _APP_METADATA.create_all(connection, checkfirst=True)
 
 
-def _history_indexes(connection: Connection) -> None:
-    """v2: id-ordered indexes for bounded, cursor-paginated history queries."""
+def _create_indexes(connection: Connection, names: set[str] | None = None) -> None:
     for table in _APP_METADATA.sorted_tables:
         for index in table.indexes:
-            index.create(connection, checkfirst=True)
+            if names is None or index.name in names:
+                index.create(connection, checkfirst=True)
+
+
+def _history_indexes(connection: Connection) -> None:
+    """v2: id-ordered indexes for bounded, cursor-paginated history queries."""
+    _create_indexes(connection, {"idx_observations_patient_id_desc", "idx_alerts_status_id_desc",
+                                 "idx_alerts_patient_id_desc", "idx_audit_entity_id"})
 
 
 def _backfill_alert_timestamps(connection: Connection) -> None:
@@ -51,10 +57,22 @@ def _backfill_alert_timestamps(connection: Connection) -> None:
         connection.execute(update(alerts).where(column.is_(None)).values({column.key: first_event}))
 
 
+def _live_stream_sessions(connection: Connection) -> None:
+    """v4: stream session table and per-session sequence columns on observations."""
+    columns = {column["name"] for column in inspect(connection).get_columns("observations")}
+    if "session_id" not in columns:
+        connection.execute(text("ALTER TABLE observations ADD COLUMN session_id VARCHAR(36)"))
+    if "sequence" not in columns:
+        connection.execute(text("ALTER TABLE observations ADD COLUMN sequence INTEGER"))
+    stream_sessions.create(connection, checkfirst=True)
+    _create_indexes(connection, {"uq_observations_session_sequence", "idx_stream_sessions_status"})
+
+
 STEPS: tuple[tuple[int, str, Callable[[Connection], None]], ...] = (
     (1, "baseline_tables", _baseline_tables),
     (2, "history_indexes", _history_indexes),
     (3, "backfill_alert_timestamps", _backfill_alert_timestamps),
+    (4, "live_stream_sessions", _live_stream_sessions),
 )
 LATEST_VERSION = STEPS[-1][0]
 
@@ -106,5 +124,5 @@ def migrate(engine: Engine) -> list[int]:
         # Idempotent repair: recreate any table or index dropped after its migration ran.
         with engine.begin() as connection:
             _baseline_tables(connection)
-            _history_indexes(connection)
+            _create_indexes(connection)
     return applied_now

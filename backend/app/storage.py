@@ -173,10 +173,13 @@ def database_health() -> dict[str, Any]:
 
 
 def insert_observation(connection: Connection, patient_id: str, inputs: dict[str, Any],
-                       prediction: dict[str, Any]) -> dict[str, Any]:
+                       prediction: dict[str, Any], session_id: str | None = None,
+                       sequence: int | None = None) -> dict[str, Any]:
     """Insert one observation inside the caller's transaction."""
     result = connection.execute(insert(_OBSERVATIONS).values(
         patient_id=patient_id,
+        session_id=session_id,
+        sequence=sequence,
         input_json=json.dumps(inputs, separators=(",", ":")),
         prediction_json=json.dumps(prediction, separators=(",", ":")),
         model_version=prediction["model_version"],
@@ -191,16 +194,30 @@ def save_observation(patient_id: str, inputs: dict[str, Any], prediction: dict[s
         return insert_observation(connection, patient_id, inputs, prediction)
 
 
-def list_observations(patient_id: str | None = None, limit: int = 50, before_id: int | None = None) -> list[dict[str, Any]]:
+def list_observations(patient_id: str | None = None, limit: int = 50, before_id: int | None = None,
+                      after_id: int | None = None, session_id: str | None = None) -> list[dict[str, Any]]:
+    """Newest first by default; with after_id, oldest first (for catching up after a reconnect)."""
     query = select(_OBSERVATIONS)
     if patient_id is not None:
         query = query.where(_OBSERVATIONS.c.patient_id == patient_id)
+    if session_id is not None:
+        query = query.where(_OBSERVATIONS.c.session_id == session_id)
     if before_id is not None:
         query = query.where(_OBSERVATIONS.c.id < before_id)
-    query = query.order_by(_OBSERVATIONS.c.id.desc()).limit(limit)
+    if after_id is not None:
+        query = query.where(_OBSERVATIONS.c.id > after_id).order_by(_OBSERVATIONS.c.id.asc()).limit(limit)
+    else:
+        query = query.order_by(_OBSERVATIONS.c.id.desc()).limit(limit)
     with get_engine().connect() as connection:
         rows = connection.execute(query).mappings().all()
     return [_serialize(row) for row in rows]
+
+
+def get_stream_observation(session_id: str, sequence: int) -> dict[str, Any] | None:
+    query = select(_OBSERVATIONS).where(_OBSERVATIONS.c.session_id == session_id, _OBSERVATIONS.c.sequence == sequence)
+    with get_engine().connect() as connection:
+        row = connection.execute(query).mappings().first()
+    return _serialize(row) if row else None
 
 
 def _serialize(row: Any) -> dict[str, Any]:
@@ -208,4 +225,5 @@ def _serialize(row: Any) -> dict[str, Any]:
     if hasattr(created_at, "isoformat"):
         created_at = created_at.isoformat()
     return {"id": row["id"], "patient_id": row["patient_id"], "created_at": created_at,
-            "inputs": json.loads(row["input_json"]), "prediction": json.loads(row["prediction_json"]), "model_version": row["model_version"]}
+            "inputs": json.loads(row["input_json"]), "prediction": json.loads(row["prediction_json"]), "model_version": row["model_version"],
+            "session_id": row["session_id"], "sequence": row["sequence"]}

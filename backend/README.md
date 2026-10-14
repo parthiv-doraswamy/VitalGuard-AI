@@ -46,6 +46,22 @@ curl -X POST http://127.0.0.1:8000/api/v1/risk/predict \
 - `GET /api/v1/observations?patient_id=DEMO-001` — filter by demo patient ID.
 - `GET /api/v1/observations?before_id=25&limit=10` — page toward older records using the returned `next_before_id` cursor.
 - `GET /api/v1/alerts?limit=50&before_id=…` — cursor-paginated synthetic alerts.
+- `GET /api/v1/observations?after_id=…&session_id=…` — oldest-first records after an id, for catching up.
+
+### Synchronized live demo (`/api/v1/live-demo`)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/config` | Producer-key requirement, limits, active session |
+| GET | `/sessions/current`, `/sessions/{id}` | Public session state (never the token) |
+| POST | `/sessions` | Start the single active stream (`scenario`, `interval_ms`, `takeover`). Returns the producer token once. 409 `producer_active` if another stream is active |
+| POST | `/sessions/{id}/pause` · `/resume` · `/stop` | Owner only (`X-Producer-Token`) |
+| POST | `/sessions/{id}/observations` | Owner asks for `{"sequence": n}`; the backend generates (existing simulator), scores, persists, then broadcasts. Retrying a committed sequence returns the same event with `duplicate: true` |
+| GET | `/events?after_id=…` | Committed events in the WebSocket contract, oldest first, for reconnect catch-up |
+
+WebSocket `/api/v1/live` events: `observation.created` (event_id, session_id, sequence, timestamp, observation, model_version, prediction, alert, server_received_at, published_at, `demo_only`, `data_origin: "synthetic"`), `alert.created`, and `stream.state` (started/paused/resumed/stopped). Sending `{"type":"ping","client_time":<ms>}` returns a pong with `server_time` so clients can estimate clock offset.
+
+Optional settings: `VITALGUARD_STREAM_PRODUCER_KEY` requires a matching `X-Demo-Producer-Key` header to start a stream; `VITALGUARD_STREAM_IDLE_TIMEOUT_SECONDS` (default 120) lets an abandoned stream be replaced without takeover.
 
 Database failures return HTTP 503 `{"error": "database_unavailable"}`; nothing is saved and no live event is sent.
 

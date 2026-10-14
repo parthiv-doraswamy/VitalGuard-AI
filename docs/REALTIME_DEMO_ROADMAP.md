@@ -38,3 +38,6 @@ The frontend patient board, charts, alerts and analytics still use local synthet
 
 ## Persistence hardening (delivered on `feature/persistence-hardening`)
 PostgreSQL required on hosted deployments (`VITALGUARD_REQUIRE_POSTGRES`), pooled connections with timeouts, atomic observation + alert writes with events published only after commit, controlled 503s on database failure, versioned repeatable migrations (v1–v3) with legacy upgrade, cursor-paginated alerts, a secret-free health check, and a backup/restore and restart-survival procedure. Verified locally against SQLite and PostgreSQL 17; hosted verification is still outstanding. See [PERSISTENCE.md](PERSISTENCE.md).
+
+## Synchronized two-laptop streaming (delivered on `feature/live-demo-backend`)
+Backend stream sessions, with producer ownership tokens and a single active producer. Laptop A requests observations by sequence; the backend generates them with the existing simulator, scores and persists them, and broadcasts each one after commit. Sequences are idempotent, and missed events can be caught up through `/api/v1/live-demo/events`. Requires migration v4. The frontend is on `feature/live-demo-frontend`. See the backend README and the main-branch roadmap.

@@ -26,7 +26,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from typing import Any
-from sqlalchemy import func, insert, select, text
+from sqlalchemy import Integer, func, insert, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -115,7 +115,7 @@ def restore_snapshot(engine: Engine, snapshot: dict[str, Any]) -> dict[str, dict
         if engine.dialect.name == "postgresql":
             # Explicit ids bypass sequences; move them past the restored maximum.
             for table in APPLICATION_TABLES:
-                if "id" in table.c:
+                if "id" in table.c and isinstance(table.c.id.type, Integer):
                     connection.execute(text(
                         f"SELECT setval(pg_get_serial_sequence('{table.name}', 'id'), "
                         f"COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM {table.name}"))

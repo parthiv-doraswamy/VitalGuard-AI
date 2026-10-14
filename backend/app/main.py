@@ -11,7 +11,8 @@ from .model import MODEL_VERSION, predict_probability
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
-from .simulator_routes import router as simulator_router
+from .simulator_routes import live_router, router as simulator_router
+from .stream_service import StreamError
 from .timeline_routes import router as timeline_router
 from .trend_routes import router as trend_router
 from .alert_routes import router as alert_router
@@ -34,6 +35,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(simulator_router)
+app.include_router(live_router)
 app.include_router(alert_router)
 app.include_router(timeline_router)
 app.include_router(trend_router)
@@ -47,7 +49,7 @@ app.add_middleware(
     # Frontend API requests can carry the demo bearer token. Browsers preflight
     # those POSTs; omitting Authorization makes the browser reject them before
     # the request reaches the API.
-    allow_headers=["Accept", "Authorization", "Content-Type"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Producer-Token", "X-Demo-Producer-Key"],
 )
 
 @app.middleware("http")
@@ -72,6 +74,11 @@ async def database_error(request: Request, exc: SQLAlchemyError):
     logger.error("Database operation failed for %s %s: %s", request.method, request.url.path, type(exc).__name__)
     return JSONResponse(status_code=503, content={"detail": "Database unavailable; the request was not saved.",
         "error": "database_unavailable", "demo_only": True})
+
+@app.exception_handler(StreamError)
+async def stream_error(_request: Request, exc: StreamError):
+    return JSONResponse(status_code=exc.status_code,
+        content={"detail": exc.detail, "error": exc.code, **exc.extra, "demo_only": True})
 
 @app.get("/")
 def root():
@@ -124,10 +131,17 @@ def explain_risk(payload: VitalInput):
 
 @app.get("/api/v1/observations")
 def observation_history(patient_id: str | None = Query(default=None, min_length=1, max_length=64),
-    limit: int = Query(default=50, ge=1, le=100), before_id: int | None = Query(default=None, ge=1)):
-    records = list_observations(patient_id=patient_id, limit=limit, before_id=before_id)
-    next_cursor = records[-1]["id"] if len(records) == limit else None
+    limit: int = Query(default=50, ge=1, le=100), before_id: int | None = Query(default=None, ge=1),
+    after_id: int | None = Query(default=None, ge=0), session_id: str | None = Query(default=None, max_length=36)):
+    if before_id is not None and after_id is not None:
+        raise HTTPException(status_code=422, detail="Use either before_id or after_id, not both")
+    records = list_observations(patient_id=patient_id, limit=limit, before_id=before_id,
+                                after_id=after_id, session_id=session_id)
+    full_page = len(records) == limit
+    next_cursor = records[-1]["id"] if full_page and after_id is None else None
+    next_after = records[-1]["id"] if full_page and after_id is not None else None
     return {"items": records, "count": len(records), "limit": limit, "next_before_id": next_cursor,
+        "next_after_id": next_after,
         "demo_only": True, "disclaimer": "Synthetic demonstration records only; not for clinical use."}
 
 @app.get("/api/v1/observations/quality")

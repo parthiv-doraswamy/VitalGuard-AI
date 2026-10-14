@@ -1,7 +1,26 @@
 """In-process WebSocket fan-out for the single-instance synthetic demo."""
 from __future__ import annotations
 import asyncio
+import json
+from datetime import datetime, timezone
 from fastapi import WebSocket, WebSocketDisconnect
+
+def _server_time() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _timed_pong(message: str) -> dict:
+    """Echo the client's clock with the server's so receivers can estimate clock offset."""
+    try:
+        payload = json.loads(message)
+    except ValueError:
+        return {"type": "error", "detail": "Unsupported message"}
+    if not isinstance(payload, dict) or payload.get("type") != "ping":
+        return {"type": "error", "detail": "Unsupported message"}
+    client_time = payload.get("client_time")
+    return {"type": "pong", "client_time": client_time if isinstance(client_time, (int, float)) else None,
+            "server_time": _server_time()}
+
 
 class LiveEventHub:
     """Broadcast persisted demo events to currently connected dashboard clients.
@@ -17,7 +36,7 @@ class LiveEventHub:
         await websocket.accept()
         async with self._lock:
             self._clients.add(websocket)
-        await websocket.send_json({"type": "connected", "demo_only": True})
+        await websocket.send_json({"type": "connected", "server_time": _server_time(), "demo_only": True})
 
     async def disconnect(self, websocket: WebSocket) -> None:
         async with self._lock:
@@ -45,6 +64,8 @@ class LiveEventHub:
                 message = await websocket.receive_text()
                 if message == "ping":
                     await websocket.send_json({"type": "pong"})
+                elif message.startswith("{"):
+                    await websocket.send_json(_timed_pong(message))
         except WebSocketDisconnect:
             await self.disconnect(websocket)
         except Exception:

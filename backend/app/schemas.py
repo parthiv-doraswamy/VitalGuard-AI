@@ -68,3 +68,20 @@ class NEWS2Input(BaseModel):
         if self.spo2_scale == 2 and not self.scale2_authorized:
             raise ValueError("SpO2 Scale 2 requires an explicit clinician-authorization assertion")
         return self
+
+
+class StreamStartRequest(BaseModel):
+    """Start a synchronized live-demo stream of fictional observations."""
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: Literal["stable", "worsening", "recovering"] = "worsening"
+    patient_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    interval_ms: int = Field(default=2000, ge=500, le=10000)
+    takeover: bool = False
+
+
+class StreamObservationRequest(BaseModel):
+    """Ask the backend to generate, score and persist the observation for one sequence number."""
+    model_config = ConfigDict(extra="forbid")
+
+    sequence: int = Field(ge=0, le=1000)

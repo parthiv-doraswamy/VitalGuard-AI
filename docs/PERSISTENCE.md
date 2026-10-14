@@ -81,8 +81,10 @@ scanned only the 100 newest alerts, so older alerts were reported as missing.
 ## 4. Schema and migrations
 
 Tables live in `backend/app/storage_schema.py`: `observations` (inputs and
-prediction JSON), `alerts`, `audit_events`, and `patients` (reserved, not yet
-written by the API). The `schema_migrations` ledger is in
+prediction JSON, plus the stream session and sequence for live-demo records),
+`alerts`, `audit_events`, `stream_sessions` (live-demo producer sessions; only a
+SHA-256 hash of the producer token is stored), and `patients` (reserved, not
+yet written by the API). The `schema_migrations` ledger is in
 `backend/app/migrations.py`.
 
 | Version | Name | Change |
@@ -90,6 +92,7 @@ written by the API). The `schema_migrations` ledger is in
 | 1 | `baseline_tables` | Create the tables (checkfirst; existing tables are kept). |
 | 2 | `history_indexes` | `(patient_id, id DESC)` on observations and alerts, `(status, id DESC)` on alerts, `(entity_type, entity_id, id)` on audit_events. |
 | 3 | `backfill_alert_timestamps` | Fill NULL `acknowledged_at`/`resolved_at` from the earliest matching audit event. |
+| 4 | `live_stream_sessions` | `stream_sessions` table (with a unique `active_slot` allowing one active producer) and nullable `session_id`/`sequence` columns on observations, unique together, so a stream sequence is stored at most once. |
 
 - Each version runs in its own transaction together with its ledger row.
 - Every step is idempotent. On PostgreSQL, a session advisory lock serializes
