@@ -10,6 +10,7 @@ const PatientDetailPage = lazy(() => import('./pages/PatientDetailPage.tsx').the
 const AlertsPage = lazy(() => import('./pages/AlertsPage.tsx').then(m => ({ default: m.AlertsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage.tsx').then(m => ({ default: m.AnalyticsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.tsx').then(m => ({ default: m.SettingsPage })));
+const HistoryPage = lazy(() => import('./pages/HistoryPage.tsx').then(m => ({ default: m.HistoryPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.tsx').then(m => ({ default: m.NotFoundPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage.tsx').then(m => ({ default: m.LoginPage })));
 const LiveDemoPage = lazy(() => import('./pages/LiveDemoPage.tsx').then(m => ({ default: m.LiveDemoPage })));
@@ -37,6 +38,7 @@ export function App() {
                 <Route path="/patients" element={<PatientsPage />} />
                 <Route path="/patients/:patientId" element={<PatientDetailPage />} />
                 <Route path="/alerts" element={<AlertsPage />} />
+                <Route path="/history" element={<HistoryPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />

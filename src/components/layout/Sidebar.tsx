@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Bell, BarChart3, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X } from 'lucide-react';
+import { Activity, Bell, BarChart3, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X, History } from 'lucide-react';
 import { useSimulation } from '../../store/useSimulation.ts';
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
   { to: '/live-demo', label: 'Live demo', icon: Radio },
   { to: '/patients', label: 'Patients', icon: Users },
   { to: '/alerts', label: 'Alerts', icon: Bell },
+  { to: '/history', label: 'History', icon: History },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
