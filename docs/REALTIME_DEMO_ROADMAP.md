@@ -50,8 +50,22 @@
 - Uses the existing observations API with bounded cursor pagination and refresh; it does not recreate the removed dashboard Prediction History panel.
 - Empty, loading and API-error states distinguish missing records from a successful history response.
 
-### Phase 10 — Release smoke checks
-- `npm run smoke:api` exercises health, model metadata, CORS, prediction persistence, synthetic evaluation, explanations, quality status, NEWS2 demo scoring, alert lifecycle/audit, and the unified timeline.
+### Phase 10 — Explainability consistency and quality
+- `POST /api/v1/risk/explain` includes a reconstruction check using the currently serving model when it supports standardized logistic regression.
+- Reconstructs log-odds from the fitted intercept plus additive contributions and compares with probability-derived log-odds under a finite positive tolerance.
+- Missing, non-numeric, non-finite inputs and invalid tolerances are rejected; unsupported model types report the check as unavailable.
+- This checks arithmetic consistency only, not causality, calibration, clinical validity, or safety.
+
+### Phase 11 — Authenticated alert escalation preview
+- `GET /api/v1/alerts/escalation-preview` previews overdue open synthetic alerts without sending notifications or changing alert state.
+- Demo review deadlines: critical 5 minutes, high 15 minutes, medium/moderate 60 minutes, low no deadline.
+- Requires a private `VITALGUARD_ALERT_ESCALATION_TOKEN` backend environment variable and a matching bearer token; fails closed when not configured.
+- Acknowledged/resolved alerts are not due; timezone-less timestamps are rejected; future timestamps clamp elapsed time to zero.
+- This is endpoint-level token protection, not user accounts or role-based authorization. Deadlines are illustrative engineering defaults, not clinical guidance.
+
+### Release smoke checks (cross-phase gate)
+- `npm run smoke:api` exercises health, model metadata, CORS, prediction persistence, synthetic evaluation, explanations and their reconstruction check, observation quality, NEWS2 demo scoring, alert lifecycle/audit, and the unified timeline.
+- When `VITALGUARD_ALERT_ESCALATION_TOKEN` is present in the smoke-test environment, it also verifies the authenticated escalation preview; otherwise that protected check is explicitly skipped.
 
 ### Phase 14 — NEWS2 scoring demonstration
 - `POST /api/v1/scores/news2` returns parameter points for respiratory rate, SpO₂, systolic blood pressure, pulse, consciousness, temperature and supplemental oxygen.
