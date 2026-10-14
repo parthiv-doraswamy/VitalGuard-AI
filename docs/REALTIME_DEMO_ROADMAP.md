@@ -63,6 +63,19 @@
 - Acknowledged/resolved alerts are not due; timezone-less timestamps are rejected; future timestamps clamp elapsed time to zero.
 - This is endpoint-level token protection, not user accounts or role-based authorization. Deadlines are illustrative engineering defaults, not clinical guidance.
 
+### Phase 12 — WebSocket delivery resilience hardening
+- Each client send has a configurable finite positive timeout (`VITALGUARD_WEBSOCKET_SEND_TIMEOUT_SECONDS`, default 2 seconds); invalid timeout configuration fails fast.
+- Concurrent fan-out removes slow, disconnected, or broken clients without serially blocking healthy clients.
+- Regression tests cover configuration validation, slow-client timeout, broken-client removal, healthy-client delivery, and empty fan-out.
+- Delivery remains best effort and per process. Clients recover missed events through REST history/replay; this is not a guarantee of exactly-once delivery or clinical alarm infrastructure.
+
+### Phase 13 — Alert review workflow integration hardening
+- The persistent alert inbox displays the protected Phase 11 review-deadline preview when an accepted bearer token is available.
+- Preview failures are isolated from the primary alert inbox: missing/expired credentials or a backend 401/503 produce a separate unavailable message instead of hiding alerts.
+- The demo persona login does not issue a backend token. Do not place the private escalation token in a public `VITE_*` variable; proper backend-authenticated session issuance remains a prerequisite for using the preview from the UI.
+- Existing filters, audit timeline, offline state, and acknowledge/resolve controls are preserved.
+- See [Phase 12 resilience notes](PHASE_12_REALTIME_RESILIENCE.md) and [Phase 13 alert workflow notes](PHASE_13_ALERT_WORKFLOWS.md).
+
 ### Release smoke checks (cross-phase gate)
 - `npm run smoke:api` exercises health, model metadata, CORS, prediction persistence, synthetic evaluation, explanations and their reconstruction check, observation quality, NEWS2 demo scoring, alert lifecycle/audit, and the unified timeline.
 - When `VITALGUARD_ALERT_ESCALATION_TOKEN` is present in the smoke-test environment, it also verifies the authenticated escalation preview; otherwise that protected check is explicitly skipped.

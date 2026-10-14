@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ChevronDown, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock3, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
 import { useOnlineStatus } from '../../services/pwa.ts';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
@@ -16,9 +16,31 @@ type BackendAlert = {
 };
 type AlertResponse = { items: BackendAlert[]; count: number; demo_only: true };
 type AuditEvent = { id: number; entity_type: string; entity_id: string; action: string; actor: string; created_at: string; details: Record<string, unknown> };
+type EscalationPreview = {
+  items: Array<{ alert_id: number; severity: string; deadline_minutes: number | null; elapsed_minutes: number; review_due: boolean; minutes_until_due: number | null }>;
+  count: number; due_count: number; policy_version: string; demo_only: true; notifications_sent: false; clinical_policy: false;
+};
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+/** The demo persona login is not server authentication and does not mint this token. */
+function operatorEscalationToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('vitalguard.operator.session');
+    if (!raw) return null;
+    const session = JSON.parse(raw) as { token?: unknown; expiresAt?: unknown };
+    if (typeof session.token === 'string' && session.token.trim() && typeof session.expiresAt === 'number' && session.expiresAt > Date.now()) {
+      return session.token.trim();
+    }
+    sessionStorage.removeItem('vitalguard.operator.session');
+  } catch {
+    sessionStorage.removeItem('vitalguard.operator.session');
+  }
+  return null;
+}
+
+async function apiRequest<T>(path: string, init?: RequestInit, bearerToken?: string): Promise<T> {
   const headers = new Headers(init?.headers);
+  if (bearerToken) headers.set('Authorization', 'Bearer ' + bearerToken);
   // Avoid unnecessary browser CORS preflights on GET requests.
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${APP_CONFIG.apiBaseUrl}${path}`, {
@@ -42,6 +64,8 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [auditByAlert, setAuditByAlert] = useState<Record<number, AuditEvent[]>>({});
   const [auditLoadingId, setAuditLoadingId] = useState<number | null>(null);
+  const [escalation, setEscalation] = useState<EscalationPreview | null>(null);
+  const [escalationError, setEscalationError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +75,27 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
       setError('');
     } catch {
       setError('Backend alert service is unavailable. Check the API deployment and database health.');
+      setLoading(false);
+      return;
+    }
+
+    // Do not expose the server-side escalation secret in a VITE_* variable.
+    // The demo role selector does not mint a backend token, so keep the inbox usable
+    // and show a separate, explicit unavailable state until authenticated access exists.
+    const token = operatorEscalationToken();
+    if (!token) {
+      setEscalation(null);
+      setEscalationError('Review deadline preview needs a valid backend escalation bearer token. The demo login is only a UI persona and does not provide one.');
+      setLoading(false);
+      return;
+    }
+    try {
+      const preview = await apiRequest<EscalationPreview>('/api/v1/alerts/escalation-preview?limit=100', undefined, token);
+      setEscalation(preview);
+      setEscalationError('');
+    } catch {
+      setEscalation(null);
+      setEscalationError('Review deadline preview is unavailable. Check the backend token configuration and deployment; the alert inbox remains available.');
     } finally {
       setLoading(false);
     }
@@ -124,6 +169,22 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
         ))}
       </div>
       {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200">{error}</p>}
+      {escalation && <section className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3" aria-label="Demo alert review deadlines">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-bold flex items-center gap-2"><Clock3 size={15} /> Review deadline preview</p>
+          <span className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${escalation.due_count > 0 ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200' : 'bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200'}`}>{escalation.due_count} due for review</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">Illustrative demo deadlines only; no notifications are sent.</p>
+        {escalation.items.filter((item) => item.review_due).length > 0
+          ? <ul className="mt-2 space-y-1">{escalation.items.filter((item) => item.review_due).map((item) =>
+              <li key={item.alert_id} className="text-xs flex items-start gap-2 text-amber-800 dark:text-amber-200">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>Alert #{item.alert_id} · {item.severity} · overdue by {Math.max(0, Math.round(item.elapsed_minutes - (item.deadline_minutes ?? item.elapsed_minutes)))} min</span>
+              </li>)}</ul>
+          : <p className="text-xs text-slate-500 mt-2">No open alerts currently exceed the demo review deadline.</p>}
+        <p className="text-[10px] text-slate-400 mt-2">Policy {escalation.policy_version} · demo only · not clinical guidance.</p>
+      </section>}
+      {!escalation && escalationError && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200">{escalationError}</p>}
       {loading && items.length === 0 ? <p className="text-sm text-slate-500 mt-4">Loading persistent alerts…</p> :
         filtered.length === 0 ? <p className="text-sm text-slate-500 mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4">No backend alerts in this filter. Submit a synthetic prediction with an elevated score to create a demo alert.</p> :
         <div className="mt-3 space-y-2">

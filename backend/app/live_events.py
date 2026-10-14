@@ -1,16 +1,20 @@
 """Per-instance WebSocket fan-out.
 
-Each backend instance pushes events to its own connected clients. Which events
-exist, and their order, comes from the shared outbox (event_broker.py); this hub
-only delivers. Bounded per instance: VITALGUARD_MAX_WEBSOCKETS connections, and a
-per-client send timeout so one slow client cannot stall delivery to the others.
+Each backend instance pushes events to its connected clients. Event ordering and
+replay come from the shared outbox (event_broker.py); this hub only delivers.
+Slow clients are removed after a bounded send timeout so they cannot stall
+healthy clients. Missed events must be recovered through REST history.
 """
 from __future__ import annotations
+
 import asyncio
 import json
+import math
 import os
 from datetime import datetime, timezone
+
 from fastapi import WebSocket, WebSocketDisconnect
+
 
 def _server_time() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -25,13 +29,26 @@ def _timed_pong(message: str) -> dict:
     if not isinstance(payload, dict) or payload.get("type") != "ping":
         return {"type": "error", "detail": "Unsupported message"}
     client_time = payload.get("client_time")
-    return {"type": "pong", "client_time": client_time if isinstance(client_time, (int, float)) else None,
-            "server_time": _server_time()}
+    return {
+        "type": "pong",
+        "client_time": client_time if isinstance(client_time, (int, float)) else None,
+        "server_time": _server_time(),
+    }
 
 
 class LiveEventHub:
     """Broadcast committed events to this instance's connected dashboard clients."""
-    def __init__(self) -> None:
+
+    def __init__(self, send_timeout_seconds: float | None = None) -> None:
+        if send_timeout_seconds is None:
+            raw_timeout = os.getenv("VITALGUARD_WEBSOCKET_SEND_TIMEOUT_SECONDS", "2")
+            try:
+                send_timeout_seconds = float(raw_timeout)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("WebSocket send timeout must be a finite positive number") from exc
+        if not math.isfinite(send_timeout_seconds) or send_timeout_seconds <= 0:
+            raise ValueError("WebSocket send timeout must be a finite positive number")
+        self._send_timeout_seconds = send_timeout_seconds
         self._clients: set[WebSocket] = set()
         self.rejected_connections = 0
         self.dropped_clients = 0
@@ -55,18 +72,18 @@ class LiveEventHub:
 
     async def broadcast(self, event: dict) -> None:
         clients = list(self._clients)
-        timeout = float(os.getenv("VITALGUARD_WEBSOCKET_SEND_TIMEOUT_SECONDS", "2"))
 
         async def send(client: WebSocket) -> WebSocket | None:
             try:
-                await asyncio.wait_for(client.send_json(event), timeout=timeout)
+                await asyncio.wait_for(client.send_json(event), timeout=self._send_timeout_seconds)
                 return None
             except Exception:
                 return client
 
-        for client in await asyncio.gather(*(send(client) for client in clients)):
+        # Concurrent sends keep a slow socket from serially delaying every client.
+        dropped = await asyncio.gather(*(send(client) for client in clients))
+        for client in dropped:
             if client is not None:
-                # Dropped clients reconnect and recover missed events through REST.
                 self._clients.discard(client)
                 self.dropped_clients += 1
 
@@ -85,5 +102,6 @@ class LiveEventHub:
             await self.disconnect(websocket)
         except Exception:
             await self.disconnect(websocket)
+
 
 hub = LiveEventHub()
