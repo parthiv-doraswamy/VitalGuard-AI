@@ -45,7 +45,7 @@ describe('BackendAlertInbox Phase 13 review preview', () => {
 
     expect(await screen.findByText(/Review deadline preview is unavailable/i)).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Alert operations inbox' })).toBeTruthy();
-    expect(vi.mocked(fetch).mock.calls[1][1]?.headers).toMatchObject({ Authorization: 'Bearer test-token' });
+    expect(new Headers(vi.mocked(fetch).mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer test-token');
   });
 
   it('renders the due count when the protected preview succeeds', async () => {
