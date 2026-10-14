@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
-from sqlalchemy import Column, DateTime, Index, Integer, MetaData, String, Table, Text, create_engine, func, insert, select, text
+from sqlalchemy import Column, DateTime, Index, Integer, MetaData, String, Table, Text, create_engine, func, insert, inspect, select, text
 from sqlalchemy.engine import Engine
 
 _DEFAULT_DB = Path(__file__).resolve().parents[1] / "vitalguard_demo.sqlite3"
@@ -59,13 +59,49 @@ def initialize_storage() -> None:
         engine.dispose()
 
 
-def database_health() -> dict[str, str]:
+def database_health() -> dict[str, str | int]:
+    """Report connectivity and schema readiness without changing the database."""
+    from .migrations import LATEST_VERSION, MIGRATIONS
+
     engine = _engine()
     try:
-        _ensure_schema(engine)
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        return {"status": "ok", "backend": "postgresql" if engine.dialect.name == "postgresql" else "sqlite"}
+            table_names = set(inspect(connection).get_table_names())
+            if "schema_migrations" not in table_names:
+                raise RuntimeError("Database schema migration ledger is missing")
+
+            applied_versions = set(
+                connection.execute(select(MIGRATIONS.c.version)).scalars().all()
+            )
+            required_versions = set(range(1, LATEST_VERSION + 1))
+            missing_versions = sorted(required_versions - applied_versions)
+            if missing_versions:
+                raise RuntimeError(
+                    f"Database schema migrations incomplete; missing versions {missing_versions}"
+                )
+
+            required_tables = {
+                "observations", "patients", "alerts", "audit_events",
+                "ingestion_records", "schema_migrations",
+            }
+            missing_tables = sorted(required_tables - table_names)
+            if missing_tables:
+                raise RuntimeError(
+                    f"Database schema is incomplete; missing tables {missing_tables}"
+                )
+
+            if applied_versions and max(applied_versions) > LATEST_VERSION:
+                raise RuntimeError(
+                    "Database schema version is newer than this application supports"
+                )
+
+            return {
+                "status": "ok",
+                "backend": "postgresql" if engine.dialect.name == "postgresql" else "sqlite",
+                "schema_version": max(applied_versions, default=0),
+                "latest_schema_version": LATEST_VERSION,
+            }
     finally:
         engine.dispose()
 
