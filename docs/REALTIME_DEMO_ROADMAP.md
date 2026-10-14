@@ -114,6 +114,16 @@
 - Do not claim hosted persistence complete until the database target and survival test are both verified.
 - The Render PostgreSQL instance is not yet confirmed connected. Do not broaden database network access to `0.0.0.0/0` to work around restricted external access.
 
+### Phase 42 — Roadmap reconciliation
+- Documented integration hardening, patient navigation, protected-route browser coverage, test reliability and CORS/live-smoke work.
+- Verified CI and live API smoke run links are recorded; hosted PostgreSQL durability remains an explicit open gate.
+
+### Phase 43 — Persistence diagnostics in live smoke tests
+- Live smoke asserts that health reports a reachable database and identifies its backend as SQLite or PostgreSQL.
+- SQLite deployments produce a clear warning that hosted restart/redeploy durability is not established.
+- PostgreSQL being active is reported as a configuration check only; restart/redeploy survival must still be tested independently.
+- This diagnostic intentionally warns rather than failing the entire demo smoke while the known hosted PostgreSQL configuration remains outstanding.
+
 ## Remaining work before any real-world use
 
 1. Provision a managed PostgreSQL database, configure secrets in Render, and verify data survival across restart/redeploy. Define retention, backup, restore, and migration procedures.
