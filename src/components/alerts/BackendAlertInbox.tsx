@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
+import { useOnlineStatus } from '../../services/pwa.ts';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
 
 type BackendAlert = {
@@ -29,8 +30,10 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function BackendAlertInbox() {
-  const { lastEvent, status } = useLiveEvents();
+/** `highlightId` comes from a notification click (/#/alerts?alert=ID). */
+export function BackendAlertInbox({ highlightId = null }: { highlightId?: number | null } = {}) {
+  const { alertsReceived, status } = useLiveEvents();
+  const online = useOnlineStatus();
   const [items, setItems] = useState<BackendAlert[]>([]);
   const [filter, setFilter] = useState<'all' | BackendAlert['status']>('all');
   const [loading, setLoading] = useState(true);
@@ -53,7 +56,8 @@ export function BackendAlertInbox() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load, lastEvent]);
+  // Reload when the shared live channel reports new alerts (live or recovered after reconnect).
+  useEffect(() => { void load(); }, [load, alertsReceived]);
 
   const transition = async (id: number, action: 'acknowledge' | 'resolve') => {
     setBusyId(id);
@@ -124,7 +128,9 @@ export function BackendAlertInbox() {
         filtered.length === 0 ? <p className="text-sm text-slate-500 mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4">No backend alerts in this filter. Submit a synthetic prediction with an elevated score to create a demo alert.</p> :
         <div className="mt-3 space-y-2">
           {filtered.map((alert) => (
-            <article key={alert.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <article key={alert.id} id={`backend-alert-${alert.id}`} data-highlighted={alert.id === highlightId || undefined}
+              ref={alert.id === highlightId ? (node) => node?.scrollIntoView({ block: 'center' }) : undefined}
+              className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center gap-3 ${alert.id === highlightId ? 'border-teal-500 ring-2 ring-teal-200' : 'border-slate-200 dark:border-slate-700'}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">#{alert.id} · {alert.severity}</span>
@@ -137,8 +143,8 @@ export function BackendAlertInbox() {
                 <button className="btn-secondary !text-xs" aria-expanded={expandedId === alert.id} onClick={() => void showAudit(alert.id)}>
                   <History size={13} /> Audit trail <ChevronDown size={13} className={expandedId === alert.id ? 'rotate-180' : ''} />
                 </button>
-                {alert.status === 'open' && <button className="btn-secondary !text-xs" disabled={busyId === alert.id} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
-                {alert.status !== 'resolved' && <button className="btn-primary !text-xs" disabled={busyId === alert.id} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
+                {alert.status === 'open' && <button className="btn-secondary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
+                {alert.status !== 'resolved' && <button className="btn-primary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
               </div>
               {expandedId === alert.id && <div className="w-full basis-full rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3">
                 <p className="text-xs font-bold flex items-center gap-1.5"><History size={13} /> Alert audit timeline</p>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Activity, AlertCircle, CheckCircle2, Clock3, Database, RefreshCw, Send } from 'lucide-react';
 import { api, type ObservationHistory, type RiskPredictionResult } from '../../services/api.ts';
+import { useOnlineStatus } from '../../services/pwa.ts';
 
 const sampleInput = {
   patient_id: 'DEMO-WEB-001',
@@ -26,6 +27,7 @@ export function RiskEnginePanel() {
   const [busy, setBusy] = useState<'health' | 'predict' | 'history' | null>(null);
   const [connection, setConnection] = useState<'unknown' | 'online' | 'offline'>('unknown');
   const [error, setError] = useState('');
+  const online = useOnlineStatus();
 
   async function checkHealth() {
     setBusy('health');
@@ -101,17 +103,18 @@ export function RiskEnginePanel() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={runPrediction} disabled={busy !== null}>
+        <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={runPrediction} disabled={busy !== null || !online}>
           <Send size={14} aria-hidden />{busy === 'predict' ? 'Running prediction…' : 'Run demo prediction'}
         </button>
-        <button type="button" className="tab-btn tab-off inline-flex items-center gap-2" onClick={checkHealth} disabled={busy !== null}>
+        <button type="button" className="tab-btn tab-off inline-flex items-center gap-2" onClick={checkHealth} disabled={busy !== null || !online}>
           <Activity size={14} aria-hidden />{busy === 'health' ? 'Checking…' : 'Check API'}
         </button>
-        <button type="button" className="tab-btn tab-off inline-flex items-center gap-2" onClick={loadHistory} disabled={busy !== null}>
+        <button type="button" className="tab-btn tab-off inline-flex items-center gap-2" onClick={loadHistory} disabled={busy !== null || !online}>
           <RefreshCw size={14} aria-hidden />{busy === 'history' ? 'Loading…' : 'Refresh history'}
         </button>
       </div>
 
+      {!online && <p className="mt-3 text-xs text-slate-500" data-testid="prediction-offline">Predictions are calculated by the backend and are unavailable offline. Nothing is computed or reused from cache.</p>}
       {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
 
       {prediction && (
