@@ -171,3 +171,16 @@ Never use real patient data. Missing or stale observations are unknown, not norm
   - A CI job that starts the backend for the live spec.
   - Cross-instance delivery: the WebSocket hub is in-process and needs a single backend instance.
   - The producer emit rate limit is per process.
+
+### Phase 48 — Model benchmarking, selection and evaluation UI (`feature/model-benchmark` backend, `feature/model-evaluation-ui` frontend; not yet deployed)
+- The API serves the artifact named in a model registry. If the active artifact fails verification it falls back to the previous one, then to rebuilding the synthetic demo model, and reports which happened. `ml/model_registry.py promote|rollback` manages the registry.
+- `/api/v1/model/info` adds `mode` (explicit **synthetic-demo** while no validated research model exists), `model_source`, the real algorithm, artifact provenance, threshold, selection and `load_error`. The prediction contract is unchanged.
+- Benchmark protocol: logistic regression (baseline) vs Random Forest vs XGBoost on identical features and patient-level splits; validation-only tuning and thresholds; predefined gates; a baseline-first rule with a paired patient bootstrap; selection frozen before test evaluation; metrics recomputable from saved predictions.
+- **Only run on the fictional fixture**, so no algorithm has been selected for the real target. The baseline was kept: Random Forest showed no robust gain, and XGBoost is not loadable by the API runtime.
+- The Settings evaluation panel shows the active model, the synthetic-demo banner, fallback/load errors, a version-mismatch warning, selection metadata, and research-report metrics (null-safe, with the Brier score).
+- **Verified locally (2026-10-14):**
+  - Backend: 188 tests on PostgreSQL + SQLite (Python 3.12 and 3.14).
+  - ML: 46 tests.
+  - Frontend: lint, 40 unit tests and build.
+  - Live API smoke script: all checks pass against this branch.
+  - Playwright: 5/5.
