@@ -35,3 +35,21 @@ Test observation → risk output → alert → acknowledgement/resolution, inclu
 
 ## Current limitation
 The frontend patient board, charts, alerts and analytics still use local synthetic data. Phase 1 is an API-level simulator, not full frontend real-time integration.
+
+## Persistence hardening (delivered on `feature/persistence-hardening`)
+PostgreSQL required on hosted deployments (`VITALGUARD_REQUIRE_POSTGRES`), pooled connections with timeouts, atomic observation + alert writes with events published only after commit, controlled 503s on database failure, versioned repeatable migrations (v1–v3) with legacy upgrade, cursor-paginated alerts, a secret-free health check, and a backup/restore and restart-survival procedure. Verified locally against SQLite and PostgreSQL 17; hosted verification is still outstanding. See [PERSISTENCE.md](PERSISTENCE.md).
+
+## Synchronized two-laptop streaming (delivered on `feature/live-demo-backend`)
+Backend stream sessions, with producer ownership tokens and a single active producer. Laptop A requests observations by sequence; the backend generates them with the existing simulator, scores and persists them, and broadcasts each one after commit. Sequences are idempotent, and missed events can be caught up through `/api/v1/live-demo/events`. Requires migration v4. The frontend is on `feature/live-demo-frontend`. See the backend README and the main-branch roadmap.
+
+## Reproducible ML pipeline (delivered on `feature/ml-pipeline`)
+The API now loads a versioned, verified artifact instead of training at import. `ml/` contains dataset preparation (MIMIC-IV format, leakage-safe as-of features, patient-level and temporal splits), baseline training with validation-only model and threshold selection, held-out evaluation, and tests. **Real-dataset training is blocked: there is no approved MIMIC-IV/eICU access.** Every result so far comes from synthetic or fictional fixture data and is not a clinical performance claim. See [ml/README.md](../ml/README.md) and [ml/data/README.md](../ml/data/README.md).
+
+## Model benchmarking and selection (delivered on `feature/model-benchmark`)
+Common model interface (load, validated predict, metadata, validate), a registry with automatic fallback to the previous artifact and manual promote/rollback, and a benchmark of logistic regression vs Random Forest vs XGBoost under identical splits. Predefined gates (deployability, latency, size, sensitivity, calibration) and a baseline-first selection rule, frozen before test evaluation. Run only on the fictional fixture, where the baseline was kept; the API stays in explicit synthetic-demo mode. See [ml/README.md](../ml/README.md).
+
+## Cross-instance scaling (delivered on `feature/scale-out`)
+Transactional outbox (migration v5) and PostgreSQL `LISTEN/NOTIFY` delivery to WebSocket clients on every instance, with gap-aware ordered dispatch, `GET /api/v1/events` recovery, health split by component, bounded WebSockets and requests, and a load-test script. Verified with two real instances on one PostgreSQL database; load-tested on one laptop, with measured values and their limitations in [SCALABILITY.md](SCALABILITY.md). Not yet tested on Render with more than one instance.
+
+## Web Push notifications (delivered on `feature/web-push` + `feature/web-push-ui`)
+Device-scoped subscriptions, because there is no user identity yet. Deliveries are queued in the alert's own transaction and sent with VAPID by a claim-based worker with retries, expiry cleanup and device receipts; payloads carry no patient data. Real Chrome 155 on macOS received foreground and background pushes through FCM. Other platforms are untested. See [WEB_PUSH.md](WEB_PUSH.md).

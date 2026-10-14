@@ -28,3 +28,23 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+
+# Local databases and backup artifacts may contain stored records; never commit them.
+*.sqlite3
+*.sqlite3-*
+*.dump
+*.snapshot.json
+backups/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# ML pipeline outputs: prepared datasets, fixtures and research artifacts (may contain
+# record-level data; never commit). The small synthetic demo artifact under
+# backend/app/model_artifacts/ is the only committed model.
+ml/runs/
+ml/artifacts/
+ml/data/fixtures/
+ml/data/raw/

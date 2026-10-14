@@ -24,6 +24,6 @@ Do not set `DATABASE_URL` to an expired or public URL. Render PostgreSQL plan/re
 ## Current limits
 
 - Patient, alert, and audit tables are schema foundations; this phase does not yet provide a full CRUD/alert workflow.
-- The migration ledger is intentionally minimal for this prototype. Use Alembic for more complex production schema evolution.
+- Superseded by [PERSISTENCE.md](PERSISTENCE.md), which describes versioned migrations v1–v3, startup validation and the backup/restore procedure. Use Alembic if schema evolution outgrows the numbered steps.
 - SQLite files on ephemeral hosts are not durable across redeploys; durable hosted PostgreSQL must be configured to meet the persistence acceptance criteria.
 - This is a synthetic demo, not a clinical record system.

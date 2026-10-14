@@ -1,0 +1,5 @@
+# Offline training/evaluation only; not installed by the deployed API.
+-r ../backend/requirements.txt
+pandas==3.0.6
+PyYAML==6.0.3
+xgboost==3.4.1  # benchmark candidate only; intentionally NOT a backend runtime dependency (see selection gates)
