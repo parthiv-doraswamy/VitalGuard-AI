@@ -46,7 +46,13 @@ async function main() {
   assert.ok(health, `Health endpoint failed after 3 attempts: ${lastHealthError}`);
   assert.equal(health.status, 'ok');
   assert.equal(health.demo_only, true);
-  console.log('✓ Health endpoint');
+  assert.equal(health.database?.status, 'ok', 'Database connectivity check did not report ok');
+  assert.ok(['postgresql', 'sqlite'].includes(health.database?.backend), 'Health response must identify the configured database backend');
+  const expectedDatabaseBackend = process.env.VITALGUARD_EXPECT_DB_BACKEND;
+  if (expectedDatabaseBackend) {
+    assert.equal(health.database.backend, expectedDatabaseBackend, `Expected database backend ${expectedDatabaseBackend}, received ${health.database.backend}`);
+  }
+  console.log(`✓ Health and database connectivity (backend: ${health.database.backend})`);
 
   const { data: model } = await request('/api/v1/model/info');
   assert.equal(model.demo_only, true);
