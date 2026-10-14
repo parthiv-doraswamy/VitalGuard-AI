@@ -41,11 +41,14 @@
 - These metrics only measure agreement with generated heuristic labels. Contributions are not SHAP or causal explanations.
 
 ### Phase 8 — Explainability workbench
-- Settings form sends fictional vitals to the contribution endpoint without saving a prediction.
-- Displays the synthetic score and signed coefficient contributions.
+- Settings form sends fictional vitals to `POST /api/v1/risk/explain` without saving a prediction.
+- Displays the synthetic score and signed standardized coefficient contributions, the active model version, method and caveat.
+- Keeps the limitation visible: these are model contributions, not SHAP values, causal explanations or clinical guidance.
 
 ### Phase 9 — Persisted history UI
-- Dashboard shows recent backend predictions, model versions, timestamps, scores and a patient filter.
+- Dedicated protected History page (`/#/history`) shows backend-persisted predictions, model versions, timestamps, scores and a patient-ID filter.
+- Uses the existing observations API with bounded cursor pagination and refresh; it does not recreate the removed dashboard Prediction History panel.
+- Empty, loading and API-error states distinguish missing records from a successful history response.
 
 ### Phase 10 — Release smoke checks
 - `npm run smoke:api` exercises health, model metadata, CORS, prediction persistence, synthetic evaluation, explanations, quality status, NEWS2 demo scoring, alert lifecycle/audit, and the unified timeline.
