@@ -12,7 +12,7 @@
 ### Phase 2 — Storage adapter
 - SQLAlchemy adapter supports local SQLite and PostgreSQL via private `DATABASE_URL`.
 - Schema creation/migration helpers and history indexes.
-- **Not complete for production:** a hosted PostgreSQL instance has not been provisioned/connected in the current deployment; SQLite remains the default unless configured.
+- **Hosted status (2026-10-14):** the live `/health` smoke check reports PostgreSQL as the active backend. This confirms runtime backend selection/reachability, but not survival across restart/redeploy or a tested backup/restore.
 
 ### Phase 3 — Live event delivery
 - WebSocket endpoint: `/api/v1/live`.
@@ -112,7 +112,7 @@
 - Verify the backend Render service uses the private PostgreSQL connection string through its `DATABASE_URL` environment variable.
 - Run a synthetic observation workflow, confirm the record is available from history/timeline, then verify it survives a backend restart or redeploy.
 - Do not claim hosted persistence complete until the database target and survival test are both verified.
-- The Render PostgreSQL instance is not yet confirmed connected. Do not broaden database network access to `0.0.0.0/0` to work around restricted external access.
+- The live API smoke now reports PostgreSQL as active. Direct SQL verification through the hosted Render connector is blocked because the database has no external IP allowlist entry; do not open it broadly to `0.0.0.0/0`. Restart/redeploy survival remains unverified.
 
 ### Phase 42 — Roadmap reconciliation
 - Documented integration hardening, patient navigation, protected-route browser coverage, test reliability and CORS/live-smoke work.
@@ -131,7 +131,7 @@
 
 ## Remaining work before any real-world use
 
-1. Provision a managed PostgreSQL database, configure secrets in Render, and verify data survival across restart/redeploy. Define retention, backup, restore, and migration procedures.
+1. Verify that the active managed PostgreSQL connection survives a controlled backend restart/redeploy using the same synthetic record ID; define and test retention, backup, restore, and migration procedures. Do not widen database network access to work around restricted external SQL access.
 2. Implement proper identity and role-based authorization before any sensitive or multi-user workflow. The current demo actor is not authentication.
 3. Add durable cross-instance event delivery if scaling beyond one backend instance.
 4. Remediate outstanding dependency advisories in controlled batches, then add production-grade observability, request limits, security review, and operational incident procedures.
@@ -141,3 +141,9 @@
 ## Safety boundary
 
 Never use real patient data. Missing or stale observations are unknown, not normal. Synthetic model metrics do not establish clinical performance, calibration, or safety. This prototype must not be used for diagnosis, triage, or treatment decisions.
+
+
+### Phase 45 — Persistence status reconciliation
+- Updated the roadmap to reflect the latest successful live API smoke: PostgreSQL is reported as the active backend.
+- This is not a durability claim. The same synthetic record must still be queried after a controlled restart/redeploy before persistence readiness can be marked complete.
+- External SQL inspection remains blocked by the database network policy; keep the database private rather than adding a broad allowlist.
