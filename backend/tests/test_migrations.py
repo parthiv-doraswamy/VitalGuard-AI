@@ -48,4 +48,9 @@ def test_database_health_reports_sqlite_backend(tmp_path, monkeypatch):
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "health.sqlite3"))
     initialize_storage()
     result = database_health()
-    assert result == {"status": "ok", "backend": "sqlite"}
+    assert result == {
+        "status": "ok",
+        "backend": "sqlite",
+        "schema_version": 3,
+        "latest_schema_version": 3,
+    }
