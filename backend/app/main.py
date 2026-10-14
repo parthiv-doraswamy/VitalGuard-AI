@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
+import logging
 import os
 import uuid
 from fastapi import FastAPI, Query, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
-from .model import MODEL_VERSION, explain, predict_probability, risk_level
+from .model import MODEL_VERSION, predict_probability
 from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
@@ -12,15 +15,21 @@ from .simulator_routes import router as simulator_router
 from .timeline_routes import router as timeline_router
 from .trend_routes import router as trend_router
 from .alert_routes import router as alert_router
-from .alert_service import create_alert
 from .data_quality import assess_observations
 from .live_events import hub
-from .storage import database_health, initialize_storage, list_observations, save_observation
+from .observation_service import record_observation
+from .storage import database_health, dispose_engines, initialize_storage, list_observations
+
+logger = logging.getLogger("vitalguard.api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Fails startup (no traffic served) if the database is unreachable or not the required backend.
     initialize_storage()
-    yield
+    try:
+        yield
+    finally:
+        dispose_engines()
 
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
@@ -53,17 +62,16 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Request-ID"] = str(uuid.uuid4())
     return response
 
-async def _publish_observation(patient_id: str, values: dict, result: RiskPrediction, saved: dict) -> None:
-    await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
-        "patient_id": patient_id, "created_at": saved["created_at"], "observation": values,
-        "prediction": result.model_dump(), "demo_only": True})
+@app.exception_handler(SQLAlchemyError)
+async def database_error(request: Request, exc: SQLAlchemyError):
+    """Report database failures as 503 instead of an unhandled 500 or a fake success.
 
-def _maybe_create_alert(patient_id: str, score: int, level: str, observation_id: int, values: dict):
-    if score < 65:
-        return None
-    return create_alert(patient_id=patient_id, event_key=f"observation:{observation_id}:elevated-risk",
-        severity="critical" if level == "critical" else "high", title=f"{level.title()} demo risk score",
-        details={"observation_id": observation_id, "risk_score": score, "risk_level": level, "vitals": values, "demo_only": True})
+    Writes run in a transaction, so a failure here means nothing was committed.
+    The exception is logged server-side; connection details are never returned.
+    """
+    logger.error("Database operation failed for %s %s: %s", request.method, request.url.path, type(exc).__name__)
+    return JSONResponse(status_code=503, content={"detail": "Database unavailable; the request was not saved.",
+        "error": "database_unavailable", "demo_only": True})
 
 @app.get("/")
 def root():
@@ -73,9 +81,11 @@ def root():
 def health():
     try:
         database = database_health()
-        return {"status": "ok", "model_version": MODEL_VERSION, "database": database, "websocket": "available", "demo_only": True}
-    except Exception:
+    except Exception as exc:
+        logger.error("Database health check failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Database health check failed")
+    return {"status": "ok" if database["status"] == "ok" else "degraded", "model_version": MODEL_VERSION,
+        "database": database, "websocket": "available", "demo_only": True}
 
 @app.websocket("/api/v1/live")
 async def live_socket(websocket: WebSocket):
@@ -100,18 +110,7 @@ def model_evaluation():
 @app.post("/api/v1/risk/predict", response_model=RiskPrediction)
 async def predict(payload: VitalInput):
     values = payload.model_dump(exclude={"patient_id"})
-    probability = predict_probability(values)
-    score = round(probability * 100)
-    level = risk_level(score)
-    result = RiskPrediction(patient_id=payload.patient_id, risk_score=score, risk_level=level,
-        model_probability=round(probability, 4), factors=explain(values), model_version=MODEL_VERSION)
-    saved = save_observation(payload.patient_id, values, result.model_dump())
-    response = result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
-    await _publish_observation(payload.patient_id, values, response, saved)
-    alert = _maybe_create_alert(payload.patient_id, score, level, saved["id"], values)
-    if alert:
-        await hub.broadcast({"type": "alert.created", "event_id": alert["id"], "alert": alert, "demo_only": True})
-    return response
+    return await record_observation(payload.patient_id, values, raise_alert=True)
 
 @app.post("/api/v1/risk/explain")
 def explain_risk(payload: VitalInput):

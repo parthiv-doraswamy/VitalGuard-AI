@@ -2,7 +2,7 @@
 
 > **Prototype only. Synthetic data. Not for clinical use.**
 
-This FastAPI service trains a small scikit-learn logistic-regression pipeline at process startup using generated synthetic observations and heuristic-generated labels. It stores submitted demo predictions in SQLite. No real patient dataset is included or loaded.
+This FastAPI service trains a small scikit-learn logistic-regression pipeline at process startup using generated synthetic observations and heuristic-generated labels. It stores submitted demo predictions in PostgreSQL when `DATABASE_URL` is set (hosted) or SQLite (local development). No real patient dataset is included or loaded.
 
 ## Run locally
 
@@ -39,16 +39,24 @@ curl -X POST http://127.0.0.1:8000/api/v1/risk/predict \
 
 ## Endpoints
 
-- `GET /health` — service health and model version.
+- `GET /health` — service health, model version and database diagnostics (backend, durability, schema version; never the URL).
 - `GET /api/v1/model/info` — algorithm, features and limitations.
 - `POST /api/v1/risk/predict` — validates vital observations, predicts a demo risk band, and persists the record.
 - `GET /api/v1/observations?limit=10` — list recent demo predictions (limit 1–100).
 - `GET /api/v1/observations?patient_id=DEMO-001` — filter by demo patient ID.
 - `GET /api/v1/observations?before_id=25&limit=10` — page toward older records using the returned `next_before_id` cursor.
+- `GET /api/v1/alerts?limit=50&before_id=…` — cursor-paginated synthetic alerts.
+
+Database failures return HTTP 503 `{"error": "database_unavailable"}`; nothing is saved and no live event is sent.
 
 ## Storage and deployment
 
-SQLite defaults to `backend/vitalguard_demo.sqlite3`. Set `VITALGUARD_DB_PATH` to change the location. On Render, a free service's local filesystem is ephemeral; history may be lost on redeploy/restart. Configure a persistent disk and point `VITALGUARD_DB_PATH` into its mounted directory if durable history is required. Do not treat this SQLite setup as a production patient-record system.
+- Hosted: set `DATABASE_URL` to the managed PostgreSQL connection string in the backend service's private environment, and set `VITALGUARD_REQUIRE_POSTGRES=true` so the service refuses to start on anything else.
+- Local: with `DATABASE_URL` unset, SQLite is used at `backend/vitalguard_demo.sqlite3` (override with `VITALGUARD_DB_PATH`). SQLite on an ephemeral host is lost on restart/redeploy.
+- Migrations run automatically at startup; `python -m app.db_tools status|migrate` (from `backend/`) shows or applies them.
+- Backup/restore drill: `python -m app.db_tools export|restore|verify`. Restart check: `python backend/scripts/persistence_check.py write|verify`.
+
+See [docs/PERSISTENCE.md](../docs/PERSISTENCE.md) for transaction semantics, migrations, pool and timeout settings, backup/restore and verification status. Do not treat this store as a patient-record system.
 
 Set `CORS_ORIGINS` to a comma-separated list of exact permitted browser origins. The deployed frontend origin is allowed by default.
 
@@ -59,7 +67,7 @@ python -m pip install -r backend/requirements.txt
 PYTHONPATH=backend pytest backend/tests -q
 ```
 
-The tests isolate SQLite in temporary directories. Tests have been added to the repository but must be run in a configured Python environment before claiming they pass.
+The tests isolate SQLite in temporary directories. To also run the PostgreSQL variants, point `VITALGUARD_TEST_POSTGRES_URL` at a **disposable** database (its `public` schema is dropped before each test), e.g. `postgresql+psycopg://user@127.0.0.1:5432/vitalguard_test`. CI does this with a PostgreSQL service container and fails if those tests are skipped.
 
 ## Important limitations
 

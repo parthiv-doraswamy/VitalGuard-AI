@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, phase-3-risk-engine]
   pull_request:
-    branches: [main]
+    branches: [main, phase-3-risk-engine]
 
 jobs:
   frontend:
@@ -22,6 +22,20 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    services:
+      # Disposable database so the PostgreSQL storage path is tested, not only SQLite.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vitalguard_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      VITALGUARD_TEST_POSTGRES_URL: postgresql+psycopg://postgres@localhost:5432/vitalguard_test
+      VITALGUARD_TEST_REQUIRE_POSTGRES: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,4 +44,4 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: python -m pip install -r backend/requirements.txt
-      - run: PYTHONPATH=backend pytest backend/tests -q
+      - run: PYTHONPATH=backend pytest backend/tests -q -rs

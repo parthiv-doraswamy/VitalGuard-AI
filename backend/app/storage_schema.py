@@ -1,9 +1,27 @@
-"""Additional durable tables for the synthetic VitalGuard demo."""
+"""Durable tables for the synthetic VitalGuard demo.
+
+Every row in these tables is synthetic demonstration data. None of them is a
+medical record, and real patient data must never be written to them.
+"""
 from sqlalchemy import (
     Column, DateTime, Index, Integer, MetaData, String, Table, Text, func,
 )
 
 metadata = MetaData()
+
+observations = Table(
+    "observations", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("patient_id", String(64), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("input_json", Text, nullable=False),
+    Column("prediction_json", Text, nullable=False),
+    Column("model_version", String(128), nullable=False),
+)
+Index("idx_observations_patient_created", observations.c.patient_id,
+      observations.c.created_at.desc(), observations.c.id.desc())
+# History pages are keyed by id (before_id cursor), so filter + order by id.
+Index("idx_observations_patient_id_desc", observations.c.patient_id, observations.c.id.desc())
 
 patients = Table(
     "patients", metadata,
@@ -29,6 +47,8 @@ alerts = Table(
     Column("resolved_at", DateTime(timezone=True)),
 )
 Index("idx_alerts_status_created", alerts.c.status, alerts.c.created_at.desc())
+Index("idx_alerts_status_id_desc", alerts.c.status, alerts.c.id.desc())
+Index("idx_alerts_patient_id_desc", alerts.c.patient_id, alerts.c.id.desc())
 
 audit_events = Table(
     "audit_events", metadata,
@@ -41,3 +61,7 @@ audit_events = Table(
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 Index("idx_audit_entity_created", audit_events.c.entity_type, audit_events.c.entity_id, audit_events.c.created_at.desc())
+Index("idx_audit_entity_id", audit_events.c.entity_type, audit_events.c.entity_id, audit_events.c.id)
+
+# Tables in foreign-key-safe order, used by migrations and backup/restore.
+APPLICATION_TABLES = (observations, patients, alerts, audit_events)

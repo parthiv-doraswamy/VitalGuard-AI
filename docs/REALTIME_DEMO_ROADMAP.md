@@ -35,3 +35,6 @@ Test observation → risk output → alert → acknowledgement/resolution, inclu
 
 ## Current limitation
 The frontend patient board, charts, alerts and analytics still use local synthetic data. Phase 1 is an API-level simulator, not full frontend real-time integration.
+
+## Persistence hardening (delivered on `feature/persistence-hardening`)
+PostgreSQL required on hosted deployments (`VITALGUARD_REQUIRE_POSTGRES`), pooled connections with timeouts, atomic observation + alert writes with events published only after commit, controlled 503s on database failure, versioned repeatable migrations (v1–v3) with legacy upgrade, cursor-paginated alerts, a secret-free health check, and a backup/restore and restart-survival procedure. Verified locally against SQLite and PostgreSQL 17; hosted verification is still outstanding. See [PERSISTENCE.md](PERSISTENCE.md).

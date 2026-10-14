@@ -28,3 +28,15 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+
+# Local databases and backup artifacts may contain stored records; never commit them.
+*.sqlite3
+*.sqlite3-*
+*.dump
+*.snapshot.json
+backups/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

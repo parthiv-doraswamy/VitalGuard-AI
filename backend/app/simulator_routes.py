@@ -2,11 +2,9 @@
 from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
-from .live_events import hub
-from .model import MODEL_VERSION, explain, predict_probability, risk_level
+from .observation_service import record_observation
 from .schemas import RiskPrediction
 from .simulator import observation_for_step
-from .storage import save_observation
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo-simulator"])
 
@@ -20,14 +18,5 @@ class SimulationRequest(BaseModel):
 async def submit_demo_observation(payload: SimulationRequest):
     """Generate, score, persist, then broadcast one fictional observation."""
     values = observation_for_step(payload.scenario, payload.step)
-    probability = predict_probability(values)
-    score = round(probability * 100)
-    result = RiskPrediction(patient_id=payload.patient_id, risk_score=score,
-        risk_level=risk_level(score), model_probability=round(probability, 4),
-        factors=explain(values), model_version=MODEL_VERSION)
-    saved = save_observation(payload.patient_id, values, result.model_dump())
-    response = result.model_copy(update={"observation_id": saved["id"], "created_at": saved["created_at"]})
-    await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
-        "patient_id": payload.patient_id, "created_at": saved["created_at"],
-        "observation": values, "prediction": response.model_dump(), "demo_only": True})
-    return response
+    # The simulator has never raised alerts; that behavior is kept unchanged.
+    return await record_observation(payload.patient_id, values, raise_alert=False)
