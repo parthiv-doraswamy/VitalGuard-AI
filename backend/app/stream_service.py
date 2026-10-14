@@ -237,10 +237,14 @@ def emit_observation(session_id: str, token: str | None, sequence: int,
             _stop(connection, session_id, "max_sequence_reached")
         raise StreamError(409, "session_complete", "The stream reached its maximum length and was stopped.")
     with _last_emit_lock:
-        last = _last_emit.get(session_id, 0.0)
-        if time.monotonic() - last < MIN_EMIT_GAP_SECONDS:
+        last = _last_emit.get(session_id)
+        # A session has no previous emission until its first observation. Do not
+        # compare against 0.0: monotonic time can be less than the configured gap
+        # on a fresh process, which incorrectly rejects the first sequence.
+        now = time.monotonic()
+        if last is not None and now - last < MIN_EMIT_GAP_SECONDS:
             raise StreamError(429, "emitting_too_fast", "Observations are being submitted too quickly.")
-        _last_emit[session_id] = time.monotonic()
+        _last_emit[session_id] = now
 
     values = observation_for_step(row["scenario"], sequence)
     result = score_observation(row["patient_id"], values)

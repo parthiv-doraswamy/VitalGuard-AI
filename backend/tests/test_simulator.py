@@ -5,6 +5,7 @@ from app.simulator import observation_for_step
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "simulator.sqlite3"))
     with TestClient(app) as test_client:
         yield test_client
@@ -94,3 +95,43 @@ def test_invalid_sequence_is_rejected(client):
     headers = {"X-Producer-Token": session["producer_token"]}
     for sequence in (-1, 1001, "zero"):
         assert client.post(path, json={"sequence": sequence}, headers=headers).status_code == 422
+
+
+def test_high_risk_simulator_observation_creates_alert_and_audit(client, monkeypatch):
+    # Exercise the workflow threshold deterministically; this is not a clinical claim.
+    from app import observation_service
+    monkeypatch.setattr(observation_service, "predict_probability", lambda _values: 0.90)
+
+    response = client.post("/api/v1/demo/observations", json={
+        "patient_id": "DEMO-ALERT-HIGH-001", "scenario": "worsening", "step": 3,
+    })
+    assert response.status_code == 200
+    prediction = response.json()
+    assert prediction["risk_score"] == 90
+
+    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-ALERT-HIGH-001"})
+    assert alerts.status_code == 200
+    assert alerts.json()["count"] == 1
+    alert = alerts.json()["items"][0]
+    assert alert["status"] == "open"
+    assert alert["details"]["observation_id"] == prediction["observation_id"]
+    assert alert["details"]["demo_only"] is True
+
+    audit = client.get(f"/api/v1/alerts/{alert['id']}/audit")
+    assert audit.status_code == 200
+    assert any(event["action"] == "created" for event in audit.json()["items"])
+
+
+def test_low_risk_simulator_observation_does_not_create_alert(client, monkeypatch):
+    from app import observation_service
+    monkeypatch.setattr(observation_service, "predict_probability", lambda _values: 0.10)
+
+    response = client.post("/api/v1/demo/observations", json={
+        "patient_id": "DEMO-ALERT-LOW-001", "scenario": "stable", "step": 0,
+    })
+    assert response.status_code == 200
+    assert response.json()["risk_score"] == 10
+
+    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-ALERT-LOW-001"})
+    assert alerts.status_code == 200
+    assert alerts.json()["count"] == 0
