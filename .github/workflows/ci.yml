@@ -2,7 +2,7 @@ name: Validate VitalGuard AI
 
 on:
   push:
-    branches: [main, phase-3-risk-engine, phase-4-authorization]
+    branches: [main, phase-3-risk-engine, phase-4-authorization, phase-1-persistence-healthcheck]
   pull_request:
     branches: [main, phase-3-risk-engine]
 
