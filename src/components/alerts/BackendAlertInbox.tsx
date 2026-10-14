@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ChevronDown, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Clock3, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
 import { useOnlineStatus } from '../../services/pwa.ts';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
