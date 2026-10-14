@@ -31,7 +31,7 @@ def test_snapshot_restores_identically_into_an_empty_database(database, tmp_path
     snapshot = export_snapshot(get_engine())
     assert snapshot["synthetic_demo_data_only"] is True
     assert snapshot["digests"]["observations"]["rows"] == 2
-    assert snapshot["digests"]["audit_events"]["rows"] == 3
+    assert snapshot["digests"]["audit_events"]["rows"] == 4
 
     for backend, url in _restore_targets(tmp_path):
         if backend == database == "postgresql":
@@ -62,7 +62,7 @@ def test_restore_refuses_a_non_empty_target(database):
 def test_restore_refuses_a_tampered_snapshot(database, tmp_path):
     _seed_records()
     snapshot = export_snapshot(get_engine())
-    snapshot["tables"]["alerts"][0]["status"] = "open"
+    snapshot["tables"]["alerts"][0]["status"] = "tampered"
     target = _build_engine(f"sqlite+pysqlite:///{tmp_path / 'tampered.sqlite3'}")
     try:
         with pytest.raises(RestoreRefused, match="checksum"):
