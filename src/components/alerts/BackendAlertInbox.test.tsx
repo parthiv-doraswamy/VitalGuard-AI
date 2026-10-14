@@ -9,8 +9,8 @@ vi.mock('../../services/pwa.ts', () => ({
   useOnlineStatus: () => true,
 }));
 
-function jsonResponse(body: unknown, ok = true, status = 200) {
-  return { ok, status, json: async () => body };
+function jsonResponse(body: unknown, ok = true, status = 200): Response {
+  return { ok, status, json: async () => body } as Response;
 }
 
 describe('BackendAlertInbox Phase 13 review preview', () => {
