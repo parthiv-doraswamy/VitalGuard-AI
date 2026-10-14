@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root { color-scheme: light; --vg-teal: #0d9488; --vg-ink: #142238; --vg-canvas: #f5f8fb; --vg-border: #e3eaf1; }
+body { @apply bg-[#f5f8fb] text-slate-900 antialiased; font-feature-settings: "tnum" 1, "cv05" 1; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.dark body, .dark { color-scheme: dark; }
+.dark body { @apply bg-slate-950 text-slate-100; }
+h1, h2, .font-display { font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
+:focus-visible { outline: 2px solid #0d9488; outline-offset: 2px; border-radius: 8px; }
+.card { @apply bg-white rounded-[20px] border border-slate-200/80 shadow-[0_2px_8px_rgba(15,35,65,0.025),0_1px_2px_rgba(8,15,36,0.04)]; }
+.dark .card { @apply bg-slate-900 border-slate-800 shadow-none; }
+.card-hover { @apply transition-all duration-200 hover:-translate-y-[2px]; }
+.card-hover:hover { box-shadow: 0 2px 8px rgba(15,35,65,.035), 0 14px 34px -18px rgba(15,35,65,.24); border-color: rgba(13,148,136,.24); }
+.glass { @apply backdrop-blur-xl bg-white/75 border border-white/60; }
+.dark .glass { @apply bg-slate-900/70 border-slate-700/60; }
+.eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400; }
+.metric { @apply tabular-nums font-extrabold tracking-tight; font-family: "Plus Jakarta Sans", Inter, sans-serif; }
+.btn { @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed select-none; }
+.btn-primary { @apply btn text-white hover:-translate-y-px; background: linear-gradient(135deg, #0f766e, #0d9488 55%, #0891b2); box-shadow: 0 6px 18px -6px rgba(13,148,136,.55); }
+.btn-primary:hover { box-shadow: 0 10px 24px -6px rgba(13,148,136,.6); }
+.btn-secondary { @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:-translate-y-px; }
+.dark .btn-secondary { @apply border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800; }
+.btn-ghost { @apply btn text-slate-500 hover:text-slate-800; }
+.btn-ghost:hover { background: rgba(15,23,42,.05); }
+.dark .btn-ghost { @apply text-slate-400 hover:text-slate-100; }
+.dark .btn-ghost:hover { background: rgba(255,255,255,.07); }
+.btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+.icon-btn { @apply p-2 rounded-xl text-slate-500 hover:text-slate-800 active:scale-95 transition-all; }
+.icon-btn:hover { background: rgba(15,23,42,.05); }
+.dark .icon-btn { @apply text-slate-400 hover:text-slate-100; }
+.dark .icon-btn:hover { background: rgba(255,255,255,.07); }
+.field { @apply rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-all; }
+.field:focus { border-color: #14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.18); }
+.dark .field { @apply border-slate-700 bg-slate-900 text-slate-200; }
+.tab-btn { @apply px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all duration-200 active:scale-[0.97]; }
+.tab-on { @apply text-white border-transparent; background: linear-gradient(135deg, #0f766e, #0891b2); box-shadow: 0 6px 18px -6px rgba(13,148,136,.55); }
+.tab-off { @apply border-slate-200 text-slate-600 bg-white/60 hover:bg-white hover:border-slate-300 hover:-translate-y-px; }
+.dark .tab-off { @apply border-slate-700 text-slate-300 hover:bg-slate-800; }
+.skel { @apply relative overflow-hidden bg-slate-200/70 rounded-xl; }
+.dark .skel { @apply bg-slate-800; }
+.skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%); animation: vg-shimmer 1.6s infinite; }
+@keyframes vg-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.table-head th { @apply text-left text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-3 whitespace-nowrap; background: rgba(248,250,252,.8); }
+.dark .table-head th { background: rgba(255,255,255,.02); }
+.table-row { @apply border-t border-slate-100 dark:border-slate-800 transition-colors duration-150; }
+.table-row:hover { background: rgba(13,148,136,.05); }
+.vg-navlink { @apply relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200; }
+.vg-grid-bg { background-image: linear-gradient(rgba(100,116,139,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(100,116,139,.12) 1px, transparent 1px); background-size: 28px 28px; }
+.clinical-panel { background: radial-gradient(circle at 88% 8%, rgba(153,246,228,.38), transparent 28%), linear-gradient(120deg,#ffffff 0%,#f4fbfa 56%,#edf8f7 100%); border: 1px solid #dcece9; box-shadow: 0 8px 28px -22px rgba(15,118,110,.28); }
+.clinical-kicker { color: #0f766e; }
+.clinical-muted { color: #52657a; }
+.dark .clinical-panel { background: radial-gradient(circle at 88% 8%, rgba(13,148,136,.18), transparent 28%), linear-gradient(120deg,#111d30 0%,#14283a 56%,#123235 100%); border-color: #29454b; }
+.dark .clinical-kicker { color: #5eead4; }
+.dark .clinical-muted { color: #c0ceda; }
+@media (max-width: 640px) { .card { border-radius: 16px; } }
+@keyframes vg-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.page-enter { animation: vg-fade-up 0.32s cubic-bezier(.22,.68,.32,1) both; }
+@keyframes vg-toast-in { from { opacity: 0; transform: translateX(20px) scale(.97); } to { opacity: 1; transform: none; } }
+.toast-enter { animation: vg-toast-in 0.25s cubic-bezier(.22,.68,.32,1) both; }
+@keyframes vg-pulse-dot { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,.5); } 50% { opacity: .7; box-shadow: 0 0 0 5px rgba(16,185,129,0); } }
+.pulse-dot { animation: vg-pulse-dot 1.8s ease-in-out infinite; }
+@keyframes vg-bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.vg-bar-grow { transform-origin: left; animation: vg-bar-grow .7s cubic-bezier(.22,.68,.32,1) both; }
+.stagger > * { animation: vg-fade-up .4s cubic-bezier(.22,.68,.32,1) both; }
+.stagger > *:nth-child(2) { animation-delay: .06s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .18s; }
+.stagger > *:nth-child(5) { animation-delay: .24s; }
+.stagger > *:nth-child(6) { animation-delay: .3s; }
+@media (prefers-reduced-motion: reduce) { .page-enter, .toast-enter, .pulse-dot, .stagger > *, .vg-bar-grow, .animate-vg-ecg, .animate-vg-drift, .skel::after { animation: none !important; } }
+
+

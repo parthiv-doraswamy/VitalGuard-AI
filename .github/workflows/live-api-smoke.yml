@@ -1,0 +1,32 @@
+name: Live API smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-api-smoke.yml'
+      - 'scripts/smoke-test.mjs'
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Deployed VitalGuard API base URL"
+        required: false
+        default: "https://vitalguard-risk-api.onrender.com"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test deployed API end-to-end
+        env:
+          VITALGUARD_API_URL: ${{ inputs.api_base_url }}
+        run: node scripts/smoke-test.mjs

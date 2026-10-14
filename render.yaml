@@ -1,0 +1,13 @@
+services:
+  - type: web
+    runtime: static
+    name: vitalguard-ai
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      # Required for React client-side routes such as /dashboard and /settings.
+      # Serve index.html so the client-side router can render the requested path.
+      - type: rewrite
+        source: /*
+        destination: /index.html
