@@ -102,7 +102,7 @@ async function main() {
     headers: {
       Origin: 'https://vitalguard-ai-g215.onrender.com',
       'Access-Control-Request-Method': 'POST',
-      'Access-Control-Request-Headers': 'content-type',
+      'Access-Control-Request-Headers': 'authorization,content-type',
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
