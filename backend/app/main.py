@@ -7,10 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
-from .model import FEATURES, active_model, predict_probability
+from .model import active_model, predict_probability
 from .model_evaluation import coefficient_contributions, evaluation_report
 from .news2 import score_news2
-from .schemas import NEWS2Input, RiskPrediction, VitalInput
+from .schemas import ModelInfo, NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import live_router, router as simulator_router
 from .stream_service import StreamError
 from .timeline_routes import router as timeline_router
@@ -100,22 +100,11 @@ def health():
 async def live_socket(websocket: WebSocket):
     await hub.serve(websocket)
 
-@app.get("/api/v1/model/info")
+@app.get("/api/v1/model/info", response_model=ModelInfo)
 def model_info():
-    model = active_model()
-    manifest = model.manifest or {}
-    dataset = manifest.get("dataset", {})
-    return {"name": "VitalGuard synthetic risk classifier", "model_version": model.version,
-        "algorithm": "StandardScaler + LogisticRegression",
-        "features": list(FEATURES),
-        "training_data": dataset.get("description", "generated synthetic observations only"),
-        "model_source": model.source,
-        "artifact": {"sha256": manifest.get("model_sha256"), "created_at": manifest.get("created_at"),
-                     "dataset_kind": dataset.get("kind", "synthetic-demo"), "dataset_id": dataset.get("id"),
-                     "training_run_id": manifest.get("training", {}).get("run_id"),
-                     "library_versions": manifest.get("library_versions")} if manifest else None,
-        "load_error": model.load_error,
-        "demo_only": True, "clinically_validated": False}
+    """Metadata of the model actually serving predictions (backward-compatible superset of v0.8 fields)."""
+    return {"name": "VitalGuard synthetic risk classifier", **active_model().metadata(),
+            "demo_only": True, "clinically_validated": False}
 
 @app.post("/api/v1/scores/news2")
 def calculate_news2(payload: NEWS2Input):
@@ -137,7 +126,9 @@ def explain_risk(payload: VitalInput):
     return {"patient_id": payload.patient_id, "model_version": active_model().version,
         "risk_score": round(predict_probability(values) * 100),
         "contributions": coefficient_contributions(values),
-        "method": "standardized logistic-regression coefficient contributions",
+        "method": ("standardized logistic-regression coefficient contributions"
+                   if active_model().supports_coefficient_contributions
+                   else f"not available for {active_model().algorithm}"),
         "caveat": "These are model contributions, not causal explanations or clinical guidance.",
         "demo_only": True}
 

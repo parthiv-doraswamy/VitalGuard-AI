@@ -8,73 +8,29 @@ one used for training, the train/validation patient sets match the manifest,
 and no test patient appears in them. The decision threshold is the one stored
 at training time (selected on validation); nothing is tuned here.
 
-Writes evaluation.json and evaluation.md next to the artifact.
+Writes evaluation.json, evaluation.md and test_predictions.csv (row ids, label,
+probability) next to the artifact; every metric is computed from that saved file.
 """
 from __future__ import annotations
 
 import argparse
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
+import pandas as pd
 
-from common import RUNS_DIR, PipelineError, load_config, sha256_ids, write_json
+from common import RUNS_DIR, PipelineError, load_config, sha256_file, sha256_ids, write_json
+from metrics import bootstrap, prediction_metrics
 from train import load_dataset
 from app.model import FEATURES
 from app.model_artifact import load_artifact
 
+PREDICTIONS_FILE = "test_predictions.csv"
 DISCLAIMER = ("Research evaluation only. Not clinically validated; not for diagnosis, triage or treatment decisions. "
               "Performance on one retrospective dataset does not establish clinical safety or effectiveness.")
-
-
-def _safe(metric, labels: np.ndarray, scores: np.ndarray) -> float | None:
-    return float(metric(labels, scores)) if len(np.unique(labels)) == 2 else None
-
-
-def threshold_metrics(labels: np.ndarray, probabilities: np.ndarray, threshold: float) -> dict[str, Any]:
-    predicted = probabilities >= threshold
-    tp = int((predicted & (labels == 1)).sum()); fp = int((predicted & (labels == 0)).sum())
-    tn = int((~predicted & (labels == 0)).sum()); fn = int((~predicted & (labels == 1)).sum())
-    ratio = lambda num, den: round(num / den, 4) if den else None  # noqa: E731
-    return {"threshold": threshold, "sensitivity": ratio(tp, tp + fn), "specificity": ratio(tn, tn + fp),
-            "precision_ppv": ratio(tp, tp + fp), "npv": ratio(tn, tn + fn),
-            "alerts_per_100_predictions": ratio(100 * (tp + fp), len(labels)),
-            "confusion_matrix": {"tp": tp, "fp": fp, "tn": tn, "fn": fn}}
-
-
-def calibration(labels: np.ndarray, probabilities: np.ndarray, bins: int) -> dict[str, Any]:
-    edges = np.linspace(0, 1, bins + 1)
-    index = np.clip(np.digitize(probabilities, edges[1:-1]), 0, bins - 1)
-    table = [{"bin": f"{edges[i]:.1f}-{edges[i + 1]:.1f}", "count": int((index == i).sum()),
-              "mean_predicted": round(float(probabilities[index == i].mean()), 4) if (index == i).any() else None,
-              "observed_rate": round(float(labels[index == i].mean()), 4) if (index == i).any() else None}
-             for i in range(bins)]
-    result: dict[str, Any] = {"brier_score": round(float(brier_score_loss(labels, probabilities)), 5), "reliability_table": table,
-                              "note": "class_weight='balanced' training shifts probabilities upward; scores are not calibrated risks."}
-    if len(np.unique(labels)) == 2:
-        logit = np.log(np.clip(probabilities, 1e-6, 1 - 1e-6) / np.clip(1 - probabilities, 1e-6, 1))
-        fit = LogisticRegression(C=1e6, max_iter=1000).fit(logit.reshape(-1, 1), labels)
-        result.update({"calibration_slope": round(float(fit.coef_[0, 0]), 4), "calibration_intercept": round(float(fit.intercept_[0]), 4)})
-    return result
-
-
-def bootstrap(rows, probabilities: np.ndarray, samples: int, seed: int) -> dict[str, Any]:
-    """Patient-level bootstrap: resample patients, keeping each patient's rows together."""
-    rng = np.random.default_rng(seed)
-    labels = rows["label"].to_numpy(int)
-    groups = rows.groupby("patient_id").indices
-    patients = list(groups)
-    stats: dict[str, list[float]] = {"roc_auc": [], "pr_auc": []}
-    for _ in range(samples):
-        chosen = np.concatenate([groups[patients[i]] for i in rng.integers(0, len(patients), len(patients))])
-        if len(np.unique(labels[chosen])) < 2:
-            continue
-        stats["roc_auc"].append(roc_auc_score(labels[chosen], probabilities[chosen]))
-        stats["pr_auc"].append(average_precision_score(labels[chosen], probabilities[chosen]))
-    return {name: ({"ci95": [round(float(np.percentile(values, 2.5)), 4), round(float(np.percentile(values, 97.5)), 4)],
-                    "resamples_used": len(values)} if values else None) for name, values in stats.items()}
 
 
 def evaluate(artifact_dir: Path, dataset_dir: Path | None = None) -> dict[str, Any]:
@@ -96,9 +52,16 @@ def evaluate(artifact_dir: Path, dataset_dir: Path | None = None) -> dict[str, A
     if test.empty:
         raise PipelineError("Test split is empty")
 
-    labels = test["label"].to_numpy(int)
-    probabilities = pipeline.predict_proba(test[list(FEATURES)].to_numpy(float))[:, 1]
+    predictions = test[["patient_id", "stay_id", "prediction_time", "label"]].copy()
+    predictions["probability"] = pipeline.predict_proba(test[list(FEATURES)].to_numpy(float))[:, 1]
+    predictions_path = artifact_dir / PREDICTIONS_FILE
+    predictions.to_csv(predictions_path, index=False)
+    # Every reported number is computed from the saved file, so it can be re-derived independently.
+    saved = pd.read_csv(predictions_path, dtype={"patient_id": str})
+    labels, probabilities = saved["label"].to_numpy(int), saved["probability"].to_numpy(float)
     config = load_config(experiment)["evaluation"]
+    computed = prediction_metrics(labels, probabilities, manifest["decision_threshold"]["value"], config["calibration_bins"])
+    calibration_report = computed.pop("calibration")
     report = {
         "model_version": manifest["model_version"],
         "evaluation_type": "held-out test split (patient-disjoint), evaluated once with the validation-selected threshold",
@@ -106,12 +69,12 @@ def evaluate(artifact_dir: Path, dataset_dir: Path | None = None) -> dict[str, A
         "target": manifest["target"],
         "test_rows": int(len(test)), "test_patients": int(test["patient_id"].nunique()),
         "test_positives": int(labels.sum()), "test_prevalence": round(float(labels.mean()), 4),
-        "metrics": {"roc_auc": _safe(roc_auc_score, labels, probabilities),
-                    "pr_auc_average_precision": _safe(average_precision_score, labels, probabilities),
-                    **threshold_metrics(labels, probabilities, manifest["decision_threshold"]["value"])},
+        "metrics": computed,
+        "predictions_file": PREDICTIONS_FILE,
+        "predictions_sha256": sha256_file(predictions_path),
         "threshold_provenance": manifest["decision_threshold"],
-        "bootstrap_95ci_patient_level": bootstrap(test, probabilities, config["bootstrap_samples"], config["bootstrap_seed"]),
-        "calibration": calibration(labels, probabilities, config["calibration_bins"]),
+        "bootstrap_95ci_patient_level": bootstrap(saved, probabilities, config["bootstrap_samples"], config["bootstrap_seed"]),
+        "calibration": calibration_report,
         "leakage_checks": {"patient_disjoint_splits": True, "dataset_hash_matches_training": True,
                            "train_validation_patients_match_manifest": True,
                            "features_use_only_values_stored_at_or_before_prediction_time": True},
@@ -122,6 +85,96 @@ def evaluate(artifact_dir: Path, dataset_dir: Path | None = None) -> dict[str, A
     write_json(artifact_dir / "evaluation.json", report)
     (artifact_dir / "evaluation.md").write_text(_markdown(report))
     return report
+
+
+def evaluate_benchmark(benchmark_dir: Path, dataset_dir: Path | None = None) -> dict[str, Any]:
+    """Score every candidate on the test split after the selection was frozen, then write the comparison report."""
+    benchmark_dir = Path(benchmark_dir)
+    selection_path = benchmark_dir / "selection.json"
+    selection = json.loads(selection_path.read_text())
+    selection_sha = sha256_file(selection_path)
+    trained = {name: item for name, item in selection["candidates"].items() if item["status"] == "trained"}
+    reference = None
+    for name, item in trained.items():
+        manifest_path = benchmark_dir / item["artifact"] / "manifest.json"
+        if sha256_file(manifest_path) != item["manifest_sha256"]:
+            raise PipelineError(f"{name}: artifact manifest changed after the selection was frozen")
+        manifest = json.loads(manifest_path.read_text())
+        comparable = (manifest["dataset"]["sha256"], manifest["features"], manifest["split"]["train_patient_ids_sha256"],
+                      manifest["split"]["validation_patient_ids_sha256"], manifest["training"]["config_sha256"])
+        if reference is None:
+            reference = comparable
+        elif comparable != reference:
+            raise PipelineError(f"{name} was not trained on the same dataset, features, splits and configuration")
+
+    reports = {name: evaluate(benchmark_dir / item["artifact"], dataset_dir) for name, item in trained.items()}
+    decision = selection["decision"]
+    rows = []
+    for name, item in selection["candidates"].items():
+        test = reports.get(name)
+        rows.append({
+            "candidate": name, "algorithm": item["algorithm"], "status": item["status"],
+            "model_version": item.get("model_version"), "eligible": item.get("eligible"), "gates": item.get("gates"),
+            "selected": name == decision.get("selected"),
+            "validation": {key: item["validation"][key] for key in ("roc_auc", "pr_auc_average_precision", "sensitivity",
+                                                                     "specificity", "precision_ppv")} | {
+                "brier_score": item["validation"]["calibration"]["brier_score"],
+                "calibration_slope": item["validation"]["calibration"].get("calibration_slope")} if test else None,
+            "paired_vs_baseline_validation": item.get("paired_vs_baseline"),
+            "test": ({key: test["metrics"][key] for key in ("roc_auc", "pr_auc_average_precision", "sensitivity",
+                                                            "specificity", "precision_ppv", "npv")} | {
+                "brier_score": test["calibration"]["brier_score"],
+                "calibration_slope": test["calibration"].get("calibration_slope"),
+                "calibration_intercept": test["calibration"].get("calibration_intercept"),
+                "predictions_sha256": test["predictions_sha256"]}) if test else None,
+            "threshold": item.get("threshold", {}).get("value"),
+            "latency": item.get("latency"), "artifact_bytes": item.get("artifact_bytes"),
+            "reason": item.get("reason"),
+        })
+    report = {
+        "benchmark_id": selection["benchmark_id"], "dataset": selection["dataset"], "target": selection["target"],
+        "features": selection["features"], "split": selection["split"], "policy": selection["policy"],
+        "decision": decision, "selection_sha256": selection_sha, "selection_frozen_at": selection["frozen_at"],
+        "test_evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "protocol": "identical features, rows and patient-level splits for every candidate; hyperparameters and "
+                    "thresholds chosen on validation; selection frozen before this test evaluation",
+        "candidates": rows, "clinically_validated": False,
+        "disclaimer": ("SYNTHETIC FIXTURE: these numbers describe fictional generated data and are meaningless as "
+                       "model performance." if selection["dataset"]["synthetic_fixture"] else DISCLAIMER),
+    }
+    write_json(benchmark_dir / "comparison_report.json", report)
+    (benchmark_dir / "comparison_report.md").write_text(_comparison_markdown(report))
+    if decision.get("selected"):
+        chosen_dir = benchmark_dir / selection["candidates"][decision["selected"]]["artifact"]
+        manifest = json.loads((chosen_dir / "manifest.json").read_text())
+        # Selection metadata travels with the chosen artifact (the model file and its hash are unchanged).
+        manifest["selection"] = {"benchmark_id": report["benchmark_id"], "selected": decision["selected"],
+                                 "rule": decision["rule"], "rationale": decision["rationale"],
+                                 "compared": [row["candidate"] for row in rows], "selection_sha256": selection_sha}
+        write_json(chosen_dir / "manifest.json", manifest)
+        write_json(chosen_dir / "comparison_report.json", report)
+    return report
+
+
+def _comparison_markdown(report: dict[str, Any]) -> str:
+    fmt = lambda v: "n/a" if v is None else f"{v:.3f}" if isinstance(v, float) else str(v)  # noqa: E731
+    lines = [f"# Model comparison — {report['benchmark_id']}", "", f"> {report['disclaimer']}", "",
+             f"- Dataset {report['dataset']['version']} ({report['dataset']['kind']}); target {report['target']}",
+             f"- Protocol: {report['protocol']}",
+             f"- Decision: **{report['decision'].get('selected')}** — {report['decision']['rule']}", ""]
+    lines += [f"  - {line}" for line in report["decision"]["rationale"]]
+    lines += ["", "| Candidate | Status | Gates | Val PR-AUC | Val ROC-AUC | Val Brier | Val cal. slope | Test PR-AUC | Test ROC-AUC | "
+              "Test sens. | Test spec. | Test Brier | p95 latency ms | Size bytes |", "|" + " --- |" * 14]
+    for row in report["candidates"]:
+        val, test = row["validation"] or {}, row["test"] or {}
+        gates = "pass" if row.get("eligible") else ("—" if row["status"] != "trained" else
+                ", ".join(k for k, ok in (row["gates"] or {}).items() if not ok))
+        lines.append(f"| {row['candidate']}{' ✔' if row['selected'] else ''} | {row['status']} | {gates} | "
+                     f"{fmt(val.get('pr_auc_average_precision'))} | {fmt(val.get('roc_auc'))} | {fmt(val.get('brier_score'))} | "
+                     f"{fmt(val.get('calibration_slope'))} | {fmt(test.get('pr_auc_average_precision'))} | {fmt(test.get('roc_auc'))} | "
+                     f"{fmt(test.get('sensitivity'))} | {fmt(test.get('specificity'))} | {fmt(test.get('brier_score'))} | "
+                     f"{fmt((row['latency'] or {}).get('single_row_p95_ms'))} | {fmt(row['artifact_bytes'])} |")
+    return "\n".join(lines) + "\n"
 
 
 def _markdown(report: dict[str, Any]) -> str:
@@ -145,15 +198,20 @@ def _markdown(report: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--artifact", type=Path, required=True)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--artifact", type=Path)
+    target.add_argument("--benchmark", type=Path, help="benchmark directory written by train.py --benchmark")
     parser.add_argument("--dataset", type=Path)
     args = parser.parse_args(argv)
     try:
-        evaluate(args.artifact, args.dataset)
+        if args.benchmark:
+            evaluate_benchmark(args.benchmark, args.dataset)
+        else:
+            evaluate(args.artifact, args.dataset)
     except PipelineError as exc:
         print(str(exc))
         return 2
-    print((args.artifact / "evaluation.md").read_text())
+    print((args.benchmark / "comparison_report.md" if args.benchmark else args.artifact / "evaluation.md").read_text())
     return 0
 
 

@@ -112,7 +112,10 @@ def load_artifact(directory: Path, expected_features: Sequence[str], expected_sh
     if expected_sha256 and actual != expected_sha256:
         raise ArtifactError("Model file hash does not match VITALGUARD_MODEL_SHA256")
     pipeline = joblib.load(model_path)
-    if not hasattr(pipeline, "predict_proba") or getattr(pipeline, "n_features_in_", None) != len(expected_features):
+    # A Pipeline whose first step is "passthrough" (tree models) reports its feature count on the final estimator.
+    feature_count = getattr(pipeline, "n_features_in_", None) or getattr(getattr(pipeline, "steps", [[None, None]])[-1][1],
+                                                                         "n_features_in_", None)
+    if not hasattr(pipeline, "predict_proba") or feature_count != len(expected_features):
         raise ArtifactError("Artifact is not a classifier for the expected feature count")
     reproduced = pipeline.predict_proba(np.array(manifest["reference_inputs"], dtype=float))[:, 1]
     if not np.allclose(reproduced, manifest["reference_probabilities"], rtol=0, atol=REFERENCE_TOLERANCE):

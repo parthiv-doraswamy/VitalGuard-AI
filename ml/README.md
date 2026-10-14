@@ -13,6 +13,8 @@
 | `train.py` | Baseline training (StandardScaler + LogisticRegression, as in the API) and the synthetic demo artifact. |
 | `evaluate.py` | One-time held-out test evaluation with the stored threshold. |
 | `fixtures.py` | Fictional MIMIC-format fixture generator (for testing only). |
+| `model_registry.py` | Candidate catalogue (logistic regression, Random Forest, XGBoost) and the deployed-artifact registry (promote / rollback). |
+| `metrics.py` | Shared validation/test metrics, calibration, and patient-level (paired) bootstraps. |
 | `tests/` | Leakage, missingness, invalid data, feature order, reproducibility and serialization tests. |
 
 Setup: `pip install -r ml/requirements.txt` (adds pandas and PyYAML to the backend requirements; the deployed API does not need them).
@@ -34,6 +36,47 @@ MIMIC_IV_DIR=... python ml/prepare_dataset.py --experiment mimic_iv --confirm-ap
 # Tests (from the repository root).
 PYTHONPATH=backend pytest ml/tests -q
 ```
+
+## Benchmarking candidate algorithms
+
+```bash
+python ml/train.py --experiment <experiment> --benchmark           # trains all candidates, freezes the selection
+python ml/evaluate.py --benchmark ml/artifacts/benchmarks/<id>      # test evaluation + comparison report
+```
+
+**Protocol** (`candidates` and `selection` in `config.yaml`, fixed before training):
+- Every candidate is fitted by the same function on the same rows, feature order and patient-level split.
+- Hyperparameters, and the decision threshold (sensitivity ≥ 0.80), are chosen on the validation split only. The comparison checks that all candidates share the dataset hash, features, train/validation patient hashes and config hash.
+- **Gates** (validation data and the deployed runtime):
+  - the model can be loaded by the backend's pinned dependencies;
+  - single-row p95 latency ≤ 25 ms;
+  - artifact ≤ 5 MB;
+  - validation sensitivity ≥ 0.75;
+  - |calibration slope − 1| ≤ 0.5.
+- **Rule:** keep the logistic-regression baseline unless a gated candidate improves validation PR-AUC by ≥ 0.02 **and** the patient-level paired-bootstrap 95% CI of that improvement excludes zero. Ties go to the simpler model. If the baseline itself fails a gate, the eligible candidate with the best validation PR-AUC is chosen. A model is never chosen for raw accuracy or complexity.
+- `selection.json` is written (and hashed) **before** any test evaluation. `evaluate.py --benchmark` refuses to run if a candidate manifest changed after the freeze.
+- Test metrics are computed from saved `test_predictions.csv` files, so every reported number can be recomputed.
+- The chosen artifact's manifest gets a `selection` block, and the comparison report is copied next to it.
+
+**XGBoost** is installed for benchmarking (`ml/requirements.txt`) but is **not** a dependency of the deployed API. The deployability gate therefore excludes it unless `xgboost` is deliberately added to `backend/requirements.txt` after review.
+
+**Result so far (2026-10-14):** only the fictional fixture has been benchmarked, which demonstrates the procedure, not performance. The baseline was kept: Random Forest's validation PR-AUC gain was −0.058 (CI −0.164 to 0.000), and XGBoost failed the deployability gate. No algorithm has been selected for the real target, because real-dataset training is blocked.
+
+## Deployed model registry and rollback
+
+`backend/app/model_artifacts/registry.json` names the `active` artifact and the `previous` one.
+
+```bash
+python ml/model_registry.py status | candidates
+python ml/model_registry.py promote <artifact_dir> [--allow-research-artifact]
+python ml/model_registry.py rollback
+```
+
+- **Promote** verifies the artifact with the backend loader, copies it into the store, and keeps the old active version as `previous`.
+- Fixture artifacts are never promotable. Research artifacts need `--allow-research-artifact` here **and** `VITALGUARD_ALLOW_NON_DEMO_MODEL=true` on the API.
+- **Rollback** re-verifies `previous` and makes it active.
+- At startup, if the active artifact fails verification, the API serves `previous` automatically (`model_source: "artifact-previous-after-active-failed"`), and only then falls back to rebuilding the synthetic model.
+- Commit a registry change only after the backend tests and the live API smoke test pass on it.
 
 ## Versioning
 

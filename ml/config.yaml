@@ -4,7 +4,7 @@
 # manifest: feature definitions, target, prediction times, inclusion criteria,
 # split, model search, threshold policy and evaluation settings. Experiments
 # below override these defaults. Change `config_version` when a definition changes.
-config_version: 1
+config_version: 2
 
 # Order and names must equal backend/app/model.py FEATURES; units are canonical
 # after conversion. Values outside valid_range are treated as invalid (missing).
@@ -59,6 +59,44 @@ model:
   random_state: 42
   # Chosen on the validation split only; the test split is never used for selection.
   selection_metric: average_precision
+
+# Candidate algorithms for benchmarking (ml/model_registry.py). Every candidate
+# gets the same features, rows, patient-level splits, threshold policy and
+# evaluation protocol. Hyperparameters are chosen on the validation split only.
+candidates:
+  logreg: {}       # baseline: uses the `model` settings above
+  random_forest:
+    n_estimators: 300
+    max_depth_grid: [4, 8]
+    min_samples_leaf_grid: [20, 50]
+  xgboost:
+    n_estimators: 300
+    max_depth_grid: [2, 3]
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 1.0
+
+# Predefined selection requirements, fixed before any candidate is trained.
+# A candidate must pass every gate (on validation data and the deployed runtime).
+# The baseline stays selected unless a more complex candidate improves the primary
+# metric by at least min_improvement AND the lower bound of the patient-level
+# paired bootstrap 95% CI of that improvement is above zero. Ties and
+# non-significant gains go to the simpler model. Test-split results are computed
+# only after the selection is frozen, and are never used for it.
+selection:
+  primary_metric: average_precision
+  min_improvement: 0.02
+  paired_bootstrap_samples: 300
+  bootstrap_seed: 13
+  gates:
+    loadable_by_backend_runtime: true    # dependencies are in backend/requirements.txt
+    max_single_row_p95_latency_ms: 25
+    max_artifact_bytes: 5000000
+    min_validation_sensitivity: 0.75     # at the validation-selected threshold
+    max_abs_calibration_slope_error: 0.5 # |slope - 1| on validation
+  latency:
+    warmup_calls: 50
+    timed_calls: 500
 
 threshold:
   # Highest threshold reaching this sensitivity on the validation split.

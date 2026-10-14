@@ -85,3 +85,30 @@ class StreamObservationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sequence: int = Field(ge=0, le=1000)
+
+
+class ModelArtifactInfo(BaseModel):
+    sha256: str | None = None
+    created_at: str | None = None
+    dataset_kind: str
+    dataset_id: str | None = None
+    training_run_id: str | None = None
+    library_versions: dict[str, str] | None = None
+    decision_threshold: float | None = None
+    selection: dict | None = None
+
+
+class ModelInfo(BaseModel):
+    """GET /api/v1/model/info. Fields up to `clinically_validated` existed before; the rest are additive."""
+    name: str
+    model_version: str
+    algorithm: str
+    features: list[str]
+    training_data: str
+    demo_only: Literal[True] = True
+    clinically_validated: Literal[False] = False
+    mode: Literal["synthetic-demo", "research-model"]
+    model_source: Literal["artifact", "artifact-previous-after-active-failed", "fallback-synthetic-training"]
+    artifact: ModelArtifactInfo | None = None
+    load_error: str | None = None
+    supports_coefficient_contributions: bool

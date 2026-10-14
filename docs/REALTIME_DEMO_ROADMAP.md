@@ -44,3 +44,6 @@ Backend stream sessions, with producer ownership tokens and a single active prod
 
 ## Reproducible ML pipeline (delivered on `feature/ml-pipeline`)
 The API now loads a versioned, verified artifact instead of training at import. `ml/` contains dataset preparation (MIMIC-IV format, leakage-safe as-of features, patient-level and temporal splits), baseline training with validation-only model and threshold selection, held-out evaluation, and tests. **Real-dataset training is blocked: there is no approved MIMIC-IV/eICU access.** Every result so far comes from synthetic or fictional fixture data and is not a clinical performance claim. See [ml/README.md](../ml/README.md) and [ml/data/README.md](../ml/data/README.md).
+
+## Model benchmarking and selection (delivered on `feature/model-benchmark`)
+Common model interface (load, validated predict, metadata, validate), a registry with automatic fallback to the previous artifact and manual promote/rollback, and a benchmark of logistic regression vs Random Forest vs XGBoost under identical splits. Predefined gates (deployability, latency, size, sensitivity, calibration) and a baseline-first selection rule, frozen before test evaluation. Run only on the fictional fixture, where the baseline was kept; the API stays in explicit synthetic-demo mode. See [ml/README.md](../ml/README.md).
