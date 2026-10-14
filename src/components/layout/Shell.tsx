@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { Sidebar, MobileNav } from './Sidebar.tsx';
 import { Header } from './Header.tsx';
 import { SimBar } from './SimBar.tsx';
@@ -7,7 +9,12 @@ import { useLiveEvents } from '../../services/useLiveEvents.ts';
 
 export function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const { status, eventCount } = useLiveEvents();
+  const navigate = useNavigate();
   const live = status === 'connected';
+  function leaveDemo() {
+    sessionStorage.removeItem('vg-demo-session');
+    navigate('/login', { replace: true });
+  }
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#f5f8fb] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:px-3 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:font-bold">
@@ -24,6 +31,7 @@ export function Shell({ title, subtitle, children }: { title: string; subtitle?:
             <strong>Backend live channel: {status}</strong>
             <span className="opacity-80">· {eventCount} live events received in this view</span>
             <span className="ml-auto text-[10px] uppercase tracking-wider font-bold">Synthetic demo only</span>
+            <button type="button" onClick={leaveDemo} className="inline-flex items-center gap-1.5 rounded-lg border border-current/20 px-2.5 py-1.5 font-semibold transition hover:bg-black/5" aria-label="Sign out of demo"><LogOut size={13} /> Exit demo</button>
           </div>
         </div>
         <main id="main-content" className="page-enter flex-1 px-4 md:px-8 py-6 max-w-[1440px] w-full mx-auto" tabIndex={-1}>
