@@ -6,6 +6,7 @@ does not survive restarts or redeploys.
 """
 from __future__ import annotations
 import json
+import logging
 import os
 import threading
 import time
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import Any
 from sqlalchemy import create_engine, event, insert, select, text
 from sqlalchemy.engine import Connection, Engine, make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.pool import StaticPool
 
 from .storage_schema import observations as _OBSERVATIONS
@@ -20,6 +22,7 @@ from .storage_schema import observations as _OBSERVATIONS
 _DEFAULT_DB = Path(__file__).resolve().parents[1] / "vitalguard_demo.sqlite3"
 _ENGINES: dict[str, Engine] = {}
 _ENGINES_LOCK = threading.Lock()
+logger = logging.getLogger("vitalguard.storage")
 
 
 class StorageConfigurationError(RuntimeError):
@@ -49,13 +52,40 @@ def _database_url() -> str:
     return f"sqlite+pysqlite:///{absolute_path.as_posix()}"
 
 
+def _backend_name(url: str) -> str:
+    """Dialect name of a database URL; never echoes the URL (it may contain a password)."""
+    try:
+        return make_url(url).get_backend_name()
+    except (ArgumentError, ValueError):
+        raise StorageConfigurationError(
+            "DATABASE_URL could not be parsed. Expected postgresql://USER:PASSWORD@HOST:PORT/DBNAME "
+            "without surrounding quotes or spaces (the configured value is not shown).") from None
+
+
+def hosted_platform() -> str | None:
+    """Name of the hosting platform when running hosted (Render sets RENDER=true), else None."""
+    if os.getenv("VITALGUARD_HOSTED", "").strip().lower() in {"1", "true", "yes"}:
+        return "configured"
+    if os.getenv("RENDER", "").strip().lower() == "true":
+        return "render"
+    return None
+
+
+def _storage_warnings(backend: str) -> list[str]:
+    if backend == "sqlite" and hosted_platform():
+        return ["Hosted deployment is using SQLite on the instance's local disk; data is lost on restart or "
+                "redeploy. Set DATABASE_URL to the managed PostgreSQL database, verify /health reports "
+                "postgresql, then set VITALGUARD_REQUIRE_POSTGRES=true."]
+    return []
+
+
 def postgres_required() -> bool:
     """Hosted deployments set VITALGUARD_REQUIRE_POSTGRES=true to refuse SQLite."""
     return os.getenv("VITALGUARD_REQUIRE_POSTGRES", "").strip().lower() in {"1", "true", "yes"}
 
 
 def _build_engine(url: str) -> Engine:
-    backend = make_url(url).get_backend_name()
+    backend = _backend_name(url)
     # hide_parameters keeps bound values (synthetic vitals) out of error text and logs.
     if backend == "sqlite":
         kwargs: dict[str, Any] = {"connect_args": {"check_same_thread": False,
@@ -137,11 +167,14 @@ def initialize_storage() -> None:
     configuration resolves to anything else, or when the database is unreachable.
     """
     url = _database_url()
-    backend = make_url(url).get_backend_name()
+    backend = _backend_name(url)
     if postgres_required() and backend != "postgresql":
         raise StorageConfigurationError(
             "VITALGUARD_REQUIRE_POSTGRES is set but DATABASE_URL does not point to PostgreSQL; "
             "refusing to start on non-durable storage.")
+    for warning in _storage_warnings(backend):
+        # Not fatal unless VITALGUARD_REQUIRE_POSTGRES is set, but never silent.
+        logger.error("Storage misconfiguration: %s", warning)
     engine = get_engine()
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
@@ -160,11 +193,16 @@ def database_health() -> dict[str, Any]:
             server_version = connection.execute(text("SHOW server_version")).scalar()
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
     backend = "postgresql" if engine.dialect.name == "postgresql" else "sqlite"
+    warnings = _storage_warnings(backend)
+    if schema_version != LATEST_VERSION:
+        warnings.append(f"Schema version {schema_version} is behind the application ({LATEST_VERSION}).")
     return {
-        "status": "ok" if schema_version == LATEST_VERSION else "degraded",
+        "status": "ok" if not warnings else "degraded",
         "backend": backend,
         "durable_backend": backend == "postgresql",
         "postgres_required": postgres_required(),
+        "hosted_platform": hosted_platform(),
+        "warnings": warnings,
         "server_version": server_version,
         "schema_version": schema_version,
         "latest_schema_version": LATEST_VERSION,

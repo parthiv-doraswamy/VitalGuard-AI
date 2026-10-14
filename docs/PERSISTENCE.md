@@ -121,6 +121,8 @@ numbered step when identity work lands.
  "server_version": "17.x", "schema_version": 3, "latest_schema_version": 3, "latency_ms": 1.4}
 ```
 
+`hosted_platform` is `render` when `RENDER=true` (or `configured` with `VITALGUARD_HOSTED=true`). On a hosted platform, SQLite makes `status` `degraded` and adds a `warnings` entry explaining that data is lost on restart (startup also logs an ERROR); `warnings` also names a schema that is behind. A `DATABASE_URL` that cannot be parsed stops startup with a message that never shows the value.
+
 The check is read-only: it runs `SELECT 1`, reads the ledger and the server
 version, and makes no DDL or writes. `status` is `degraded` when the schema is
 behind. The response never includes the URL, host, database name, user or
