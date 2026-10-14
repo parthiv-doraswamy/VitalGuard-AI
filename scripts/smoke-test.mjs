@@ -46,7 +46,14 @@ async function main() {
   assert.ok(health, `Health endpoint failed after 3 attempts: ${lastHealthError}`);
   assert.equal(health.status, 'ok');
   assert.equal(health.demo_only, true);
-  console.log('✓ Health endpoint');
+  assert.equal(health.database?.status, 'ok', 'Health must confirm a reachable database');
+  assert.ok(['sqlite', 'postgresql'].includes(health.database?.backend), 'Health must identify the active storage backend');
+  if (health.database.backend === 'sqlite') {
+    console.warn('⚠ Persistence readiness: API is using SQLite. On hosted ephemeral storage, records may not survive restart/redeploy; configure DATABASE_URL for PostgreSQL and verify durability.');
+  } else {
+    console.log('✓ PostgreSQL backend is active; restart/redeploy durability still requires a separate verification.');
+  }
+  console.log('✓ Health endpoint and storage-backend diagnostics');
 
   const { data: model } = await request('/api/v1/model/info');
   assert.equal(model.demo_only, true);
