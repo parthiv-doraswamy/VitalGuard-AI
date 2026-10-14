@@ -1,29 +1,99 @@
 import { APP_CONFIG } from './config.ts';
-import type { ObservationHistory } from './api.ts';
+import type { ObservationEvent, ObservationHistory, StreamSession } from './api.ts';
 
-export interface LiveObservationEvent {
-  type: 'observation.created';
-  event_id: number;
-  patient_id: string;
-  created_at: string;
-  observation: Record<string, number>;
-  prediction: { risk_score: number; risk_level: string; model_version?: string };
-  demo_only: true;
-}
+export type LiveObservationEvent = ObservationEvent;
 export interface LiveAlertEvent {
   type: 'alert.created';
   event_id: number;
+  observation_id?: number;
+  session_id?: string | null;
   alert: { id: number; patient_id: string; title: string; severity: string; status: string; created_at: string };
   demo_only: true;
 }
-export type LiveEvent = LiveObservationEvent | LiveAlertEvent | { type: 'connected' | 'pong'; demo_only?: true };
+export interface StreamStateEvent {
+  type: 'stream.state';
+  action: 'started' | 'paused' | 'resumed' | 'stopped';
+  session: StreamSession;
+  demo_only: true;
+}
+export interface PongEvent { type: 'pong'; client_time?: number | null; server_time?: string }
+export type LiveEvent =
+  | LiveObservationEvent | LiveAlertEvent | StreamStateEvent | PongEvent
+  | { type: 'connected'; server_time?: string; demo_only?: true }
+  | { type: 'error'; detail?: string };
+export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';
 
-export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: (status: 'connecting' | 'connected' | 'reconnecting' | 'offline') => void) {
+/** One clock-offset sample: serverTime ≈ localTime + offsetMs, accurate to about ±rttMs/2. */
+export interface ClockSample { offsetMs: number; rttMs: number }
+
+export function clockSampleFromPong(pong: PongEvent, receivedAt: number): ClockSample | null {
+  if (typeof pong.client_time !== 'number' || !pong.server_time) return null;
+  const serverTime = Date.parse(pong.server_time);
+  if (Number.isNaN(serverTime)) return null;
+  const rttMs = Math.max(0, receivedAt - pong.client_time);
+  return { offsetMs: serverTime - (pong.client_time + rttMs / 2), rttMs };
+}
+
+/** Prefer the lowest-RTT sample: it bounds the offset error most tightly. */
+export function bestClockSample(samples: ClockSample[]): ClockSample | null {
+  return samples.reduce<ClockSample | null>((best, sample) => (!best || sample.rttMs < best.rttMs ? sample : best), null);
+}
+
+/**
+ * Server receipt → delivered on this device, in ms, corrected for clock offset.
+ * Null when the event has no server timestamp (e.g. recovered through REST) or no clock sample exists yet.
+ */
+export function deliveryLatencyMs(event: ObservationEvent, receivedAt: number, clock: ClockSample | null): number | null {
+  if (!clock || !event.server_received_at) return null;
+  const serverReceived = Date.parse(event.server_received_at);
+  if (Number.isNaN(serverReceived)) return null;
+  return Math.max(0, Math.round(receivedAt + clock.offsetMs - serverReceived));
+}
+
+export interface LoggedEvent {
+  event: ObservationEvent;
+  receivedAt: number;
+  origin: 'live' | 'recovered';
+  latencyMs: number | null;
+  /** Exact submit → receipt time, only known on the producing device. */
+  localLatencyMs: number | null;
+}
+
+/**
+ * Merge newly received events into a newest-first log, keyed by event_id.
+ * An event seen live and again during catch-up is kept once (the first copy wins).
+ */
+export function mergeEvents(log: LoggedEvent[], incoming: LoggedEvent[], max = 200): { log: LoggedEvent[]; added: LoggedEvent[] } {
+  const seen = new Set(log.map((item) => item.event.event_id));
+  const added: LoggedEvent[] = [];
+  for (const item of incoming) {
+    if (seen.has(item.event.event_id)) continue;
+    seen.add(item.event.event_id);
+    added.push(item);
+  }
+  if (added.length === 0) return { log, added };
+  const merged = [...added, ...log].sort((a, b) => b.event.event_id - a.event.event_id).slice(0, max);
+  return { log: merged, added };
+}
+
+interface SocketOptions {
+  /** Called on every successful (re)connect; `reconnect` is false only for the first connection. */
+  onOpen?: (info: { reconnect: boolean }) => void;
+  onClockSample?: (sample: ClockSample) => void;
+  heartbeatMs?: number;
+}
+
+export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: (status: LiveStatus) => void, options: SocketOptions = {}) {
   let socket: WebSocket | null = null;
   let stopped = false;
   let retry = 0;
+  let opened = false;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+  const sendPing = () => {
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping', client_time: Date.now() }));
+  };
 
   const connect = () => {
     if (stopped) return;
@@ -39,17 +109,25 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
     socket.onopen = () => {
       retry = 0;
       onStatus('connected');
-      heartbeat = setInterval(() => {
-        if (socket?.readyState === WebSocket.OPEN) socket.send('ping');
-      }, 25000);
+      options.onOpen?.({ reconnect: opened });
+      opened = true;
+      sendPing();
+      heartbeat = setInterval(sendPing, options.heartbeatMs ?? 15000);
     };
     socket.onmessage = (message) => {
+      const receivedAt = Date.now();
+      let event: LiveEvent;
       try {
-        const event = JSON.parse(String(message.data)) as LiveEvent;
-        onEvent(event);
+        event = JSON.parse(String(message.data)) as LiveEvent;
       } catch {
         // Ignore malformed frames; the REST history remains the source of truth.
+        return;
       }
+      if (event.type === 'pong') {
+        const sample = clockSampleFromPong(event, receivedAt);
+        if (sample) options.onClockSample?.(sample);
+      }
+      onEvent(event);
     };
     socket.onerror = () => socket?.close();
     socket.onclose = () => {

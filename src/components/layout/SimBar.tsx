@@ -17,13 +17,13 @@ export function SimBar() {
           <div className="min-w-0">
             <p className="text-[13px] font-bold flex items-center gap-2 tracking-tight text-slate-800">
               <span className={`h-2 w-2 rounded-full shrink-0 ${running ? 'bg-emerald-500 pulse-dot' : 'bg-slate-300'}`} aria-hidden />
-              DEMO SIMULATION
+              LOCAL DEMO SIMULATION
               <span className="font-semibold text-slate-400 tabular-nums">· t+{tick}</span>
               {running && <span className="text-[10px] font-bold tracking-[0.1em] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-1.5 py-0.5">RUNNING</span>}
             </p>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
               <Link to="/patients/P-SIM-003" className="font-bold text-teal-700 hover:underline">P-SIM-003</Link>
-              {' '}scenario: {hero?.trend ?? 'worsening'} · synthetic observations only
+              {' '}scenario: {hero?.trend ?? 'worsening'} · synthetic · runs in this browser only, not synchronized with other devices
             </p>
           </div>
         </div>

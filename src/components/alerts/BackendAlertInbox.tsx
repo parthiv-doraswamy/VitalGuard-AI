@@ -30,7 +30,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function BackendAlertInbox() {
-  const { lastEvent, status } = useLiveEvents();
+  const { alertsReceived, status } = useLiveEvents();
   const [items, setItems] = useState<BackendAlert[]>([]);
   const [filter, setFilter] = useState<'all' | BackendAlert['status']>('all');
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,8 @@ export function BackendAlertInbox() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load, lastEvent]);
+  // Reload when the shared live channel reports new alerts (live or recovered after reconnect).
+  useEffect(() => { void load(); }, [load, alertsReceived]);
 
   const transition = async (id: number, action: 'acknowledge' | 'resolve') => {
     setBusyId(id);

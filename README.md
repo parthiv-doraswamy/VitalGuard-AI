@@ -72,6 +72,7 @@ Copy `.env.example` to `.env` for local development. Vite variables prefixed wit
 - Source-documented NEWS2 parameter scoring demo endpoint (`POST /api/v1/scores/news2`) and Settings calculator; this is not a clinically validated or approved implementation.
 - Unified persisted patient timeline (`GET /api/v1/patients/{patient_id}/timeline`) and descriptive trend endpoint (`GET /api/v1/observations/trends?patient_id=...`).
 - Deterministic simulator endpoint for stable, worsening, and recovering fictional observation scenarios.
+- Synchronized two-laptop streaming demo (`/#/live-demo`): one producer starts a backend stream session; every signed-in dashboard receives the same committed, backend-scored fictional events, and catches up missed events after reconnecting. See the roadmap, Phase 47.
 
 ### Phase 1 API: synthetic observation ingestion
 

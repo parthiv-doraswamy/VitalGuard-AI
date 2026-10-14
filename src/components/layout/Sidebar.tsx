@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Bell, BarChart3, LayoutDashboard, Settings, ShieldCheck, Users, Menu, X } from 'lucide-react';
+import { Activity, Bell, BarChart3, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X } from 'lucide-react';
 import { useSimulation } from '../../store/useSimulation.ts';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/live-demo', label: 'Live demo', icon: Radio },
   { to: '/patients', label: 'Patients', icon: Users },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
