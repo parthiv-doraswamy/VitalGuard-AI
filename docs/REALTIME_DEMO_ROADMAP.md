@@ -124,6 +124,11 @@
 - PostgreSQL being active is reported as a configuration check only; restart/redeploy survival must still be tested independently.
 - This diagnostic intentionally warns rather than failing the entire demo smoke while the known hosted PostgreSQL configuration remains outstanding.
 
+### Phase 44 — API security-header regression coverage
+- Live API smoke checks `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Cache-Control` values on an API response.
+- The smoke test also requires a server-generated `X-Request-ID` for basic request correlation.
+- These checks validate baseline headers only; they do not replace a security review or authentication/authorization controls.
+
 ## Remaining work before any real-world use
 
 1. Provision a managed PostgreSQL database, configure secrets in Render, and verify data survival across restart/redeploy. Define retention, backup, restore, and migration procedures.
