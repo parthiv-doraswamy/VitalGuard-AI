@@ -112,7 +112,13 @@ async function main() {
     'https://vitalguard-ai-g215.onrender.com',
     'CORS must allow the deployed frontend origin',
   );
-  console.log('✓ Frontend CORS preflight');
+  const allowedHeaders = (preflight.headers.get('access-control-allow-headers') || '')
+    .toLowerCase()
+    .split(',')
+    .map((header) => header.trim());
+  assert.ok(allowedHeaders.includes('authorization'), 'CORS must allow Authorization for authenticated browser requests');
+  assert.ok(allowedHeaders.includes('content-type'), 'CORS must allow Content-Type for JSON requests');
+  console.log('✓ Frontend CORS origin and requested headers');
 
   // Use fictional observations and a unique demo identifier so this test never
   // touches a real patient record. The API intentionally persists demo outputs.
