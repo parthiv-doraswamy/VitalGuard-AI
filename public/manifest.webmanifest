@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "VitalGuard AI",
+  "short_name": "VitalGuard",
+  "description": "VitalGuard AI synthetic-data early-warning demo. Not for clinical use.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f8fb",
+  "theme_color": "#102a43",
+  "categories": ["health", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/vitalguard.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
