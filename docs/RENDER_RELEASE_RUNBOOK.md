@@ -39,6 +39,14 @@ The live smoke workflow is intentionally manual for release verification so it d
 - After a frontend deploy, confirm `https://vitalguard-ai-g215.onrender.com/sw.js` returns JavaScript (not `index.html`), then follow the manual checklist in [PWA.md](PWA.md).
 - Users on an older version see an update prompt. Render's 5-minute CDN cache can delay it. Never add a second service worker or change the worker's file name without a migration plan.
 
+## Alert escalation preview
+
+- The synthetic preview endpoint is `GET /api/v1/alerts/escalation-preview`.
+- Set `VITALGUARD_ALERT_ESCALATION_TOKEN` as a private backend environment variable before using it. Do not put this token in source control or a public `VITE_*` variable.
+- The endpoint returns HTTP 503 when the server token is not configured and HTTP 401 for missing/invalid request tokens.
+- The token protects this endpoint only; it is not a replacement for application-wide user identity or role-based authorization.
+- No external notifications are sent. Deadlines are demo workflow values, not clinical guidance.
+
 ## Current limitations
 
 - Hosted PostgreSQL is not confirmed configured. SQLite remains the backend default unless `DATABASE_URL` is set. A local SQLite file on a hosted ephemeral filesystem is not durable across all redeploy/restart scenarios.

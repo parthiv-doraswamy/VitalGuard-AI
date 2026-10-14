@@ -1,10 +1,11 @@
 """HTTP endpoints for synthetic demo alert lifecycle."""
 from typing import Literal
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from .event_broker import events
 from .alert_service import MAX_AUDIT_EVENTS, get_alert, list_alerts, list_alert_audit, transition_alert
+from .escalation_policy import POLICY_VERSION, authenticate_escalation_preview, evaluate_escalation
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
@@ -29,6 +30,26 @@ async def _transition(alert_id: int, action: str, actor: str):
     # An alert.updated event was written to the outbox if the state changed.
     await events.after_commit()
     return {"item": result, "demo_only": True}
+
+@router.get("/escalation-preview")
+def get_escalation_preview(
+    limit: int = Query(default=100, ge=1, le=100),
+    _principal: dict[str, str] = Depends(authenticate_escalation_preview),
+):
+    """Preview due synthetic alert reviews; authentication is required and no notifications are sent."""
+    previews = [evaluate_escalation(item) for item in list_alerts(status="open", limit=limit)]
+    due_count = sum(1 for item in previews if item["review_due"])
+    return {
+        "items": previews,
+        "count": len(previews),
+        "due_count": due_count,
+        "policy_version": POLICY_VERSION,
+        "demo_only": True,
+        "notifications_sent": False,
+        "clinical_policy": False,
+        "disclaimer": "Illustrative engineering deadlines only; not clinical guidance.",
+    }
+
 
 @router.post("/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: int, payload: AlertAction):
