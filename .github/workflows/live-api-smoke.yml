@@ -13,6 +13,14 @@ on:
         required: false
         default: "https://vitalguard-risk-api.onrender.com"
         type: string
+      expected_database_backend:
+        description: "Database backend required for this release verification"
+        required: true
+        default: postgresql
+        type: choice
+        options:
+          - postgresql
+          - sqlite
 
 permissions:
   contents: read
@@ -29,4 +37,5 @@ jobs:
       - name: Test deployed API end-to-end
         env:
           VITALGUARD_API_URL: ${{ inputs.api_base_url }}
+          VITALGUARD_EXPECT_DB_BACKEND: ${{ inputs.expected_database_backend }}
         run: node scripts/smoke-test.mjs
