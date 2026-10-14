@@ -53,9 +53,10 @@ export function BackendPhase567Panel() {
     setBusy(true);
     setError('');
     try {
-      const query = status === 'all' ? '' : `?status=${status}`;
+      const params = new URLSearchParams({ limit: '20' });
+      if (status !== 'all') params.set('status', status);
       const [alertResult, qualityResult, evaluationResult] = await Promise.all([
-        apiRequest<AlertResponse>(`/api/v1/alerts${query}&limit=20`.replace('?&', '?')),
+        apiRequest<AlertResponse>(`/api/v1/alerts?${params.toString()}`),
         apiRequest<QualityReport>('/api/v1/observations/quality?limit=100'),
         apiRequest<EvaluationReport>('/api/v1/model/evaluation'),
       ]);
