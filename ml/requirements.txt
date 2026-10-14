@@ -1,0 +1,4 @@
+# Offline training/evaluation only; not installed by the deployed API.
+-r ../backend/requirements.txt
+pandas==3.0.6
+PyYAML==6.0.3

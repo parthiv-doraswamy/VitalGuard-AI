@@ -2,7 +2,7 @@
 
 > **Prototype only. Synthetic data. Not for clinical use.**
 
-This FastAPI service trains a small scikit-learn logistic-regression pipeline at process startup using generated synthetic observations and heuristic-generated labels. It stores submitted demo predictions in PostgreSQL when `DATABASE_URL` is set (hosted) or SQLite (local development). No real patient dataset is included or loaded.
+This FastAPI service serves a small scikit-learn logistic-regression pipeline trained on generated synthetic observations with heuristic-generated labels. The model is loaded from a versioned, hash-verified artifact (`app/model_artifacts/synthetic-logreg-0.1.0/`, built by `python ml/train.py --experiment synthetic_demo`); nothing is trained at import or startup. If the artifact is missing or fails verification, the identical model is rebuilt in-process and `/api/v1/model/info` reports `model_source: "fallback-synthetic-training"`. Set `VITALGUARD_MODEL_REQUIRE_ARTIFACT=true` to fail instead. See [ml/README.md](../ml/README.md). It stores submitted demo predictions in PostgreSQL when `DATABASE_URL` is set (hosted) or SQLite (local development). No real patient dataset is included or loaded.
 
 ## Run locally
 

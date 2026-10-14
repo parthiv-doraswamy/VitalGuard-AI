@@ -16,7 +16,7 @@ from sqlalchemy.engine import Connection
 from starlette.concurrency import run_in_threadpool
 from .alert_service import insert_alert
 from .live_events import hub
-from .model import MODEL_VERSION, explain, predict_probability, risk_level
+from .model import active_model, explain, predict_probability, risk_level
 from .schemas import RiskPrediction
 from .storage import get_engine, insert_observation
 
@@ -27,7 +27,7 @@ def score_observation(patient_id: str, values: dict[str, Any]) -> RiskPrediction
     probability = predict_probability(values)
     score = round(probability * 100)
     return RiskPrediction(patient_id=patient_id, risk_score=score, risk_level=risk_level(score),
-        model_probability=round(probability, 4), factors=explain(values), model_version=MODEL_VERSION)
+        model_probability=round(probability, 4), factors=explain(values), model_version=active_model().version)
 
 
 def _alert_for(patient_id: str, result: RiskPrediction, observation_id: int, values: dict[str, Any]) -> dict | None:

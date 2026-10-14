@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
-from .model import MODEL_VERSION, predict_probability
-from .model_evaluation import coefficient_contributions, evaluate_synthetic_holdout
+from .model import FEATURES, active_model, predict_probability
+from .model_evaluation import coefficient_contributions, evaluation_report
 from .news2 import score_news2
 from .schemas import NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import live_router, router as simulator_router
@@ -27,6 +27,8 @@ logger = logging.getLogger("vitalguard.api")
 async def lifespan(_app: FastAPI):
     # Fails startup (no traffic served) if the database is unreachable or not the required backend.
     initialize_storage()
+    # Load (never train) the verified model artifact before serving; falls back as documented in model.py.
+    active_model()
     try:
         yield
     finally:
@@ -91,7 +93,7 @@ def health():
     except Exception as exc:
         logger.error("Database health check failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Database health check failed")
-    return {"status": "ok" if database["status"] == "ok" else "degraded", "model_version": MODEL_VERSION,
+    return {"status": "ok" if database["status"] == "ok" else "degraded", "model_version": active_model().version,
         "database": database, "websocket": "available", "demo_only": True}
 
 @app.websocket("/api/v1/live")
@@ -100,10 +102,20 @@ async def live_socket(websocket: WebSocket):
 
 @app.get("/api/v1/model/info")
 def model_info():
-    return {"name": "VitalGuard synthetic risk classifier", "model_version": MODEL_VERSION,
+    model = active_model()
+    manifest = model.manifest or {}
+    dataset = manifest.get("dataset", {})
+    return {"name": "VitalGuard synthetic risk classifier", "model_version": model.version,
         "algorithm": "StandardScaler + LogisticRegression",
-        "features": ["age", "heart_rate", "spo2", "systolic_bp", "diastolic_bp", "temperature", "respiratory_rate"],
-        "training_data": "generated synthetic observations only", "demo_only": True, "clinically_validated": False}
+        "features": list(FEATURES),
+        "training_data": dataset.get("description", "generated synthetic observations only"),
+        "model_source": model.source,
+        "artifact": {"sha256": manifest.get("model_sha256"), "created_at": manifest.get("created_at"),
+                     "dataset_kind": dataset.get("kind", "synthetic-demo"), "dataset_id": dataset.get("id"),
+                     "training_run_id": manifest.get("training", {}).get("run_id"),
+                     "library_versions": manifest.get("library_versions")} if manifest else None,
+        "load_error": model.load_error,
+        "demo_only": True, "clinically_validated": False}
 
 @app.post("/api/v1/scores/news2")
 def calculate_news2(payload: NEWS2Input):
@@ -112,7 +124,7 @@ def calculate_news2(payload: NEWS2Input):
 
 @app.get("/api/v1/model/evaluation")
 def model_evaluation():
-    return evaluate_synthetic_holdout()
+    return evaluation_report()
 
 @app.post("/api/v1/risk/predict", response_model=RiskPrediction)
 async def predict(payload: VitalInput):
@@ -122,7 +134,7 @@ async def predict(payload: VitalInput):
 @app.post("/api/v1/risk/explain")
 def explain_risk(payload: VitalInput):
     values = payload.model_dump(exclude={"patient_id"})
-    return {"patient_id": payload.patient_id, "model_version": MODEL_VERSION,
+    return {"patient_id": payload.patient_id, "model_version": active_model().version,
         "risk_score": round(predict_probability(values) * 100),
         "contributions": coefficient_contributions(values),
         "method": "standardized logistic-regression coefficient contributions",

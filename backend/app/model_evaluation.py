@@ -5,6 +5,11 @@ agreement with that synthetic labeling process, not clinical performance.
 """
 from __future__ import annotations
 
+import json
+import os
+from functools import lru_cache
+from pathlib import Path
+
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
@@ -19,9 +24,26 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 
-from .model import FEATURES, MODEL, MODEL_VERSION, _training_data
+from .model import DEFAULT_ARTIFACT_DIR, FEATURES, MODEL_VERSION, _training_data, active_model
+
+EVALUATION_FILE = "evaluation.json"
 
 
+def evaluation_report() -> dict[str, object]:
+    """Evaluation stored with the active artifact; computed (once per process) only as a fallback."""
+    model = active_model()
+    if model.source == "artifact":
+        path = _artifact_dir() / EVALUATION_FILE
+        if path.is_file():
+            return json.loads(path.read_text())
+    return evaluate_synthetic_holdout()
+
+
+def _artifact_dir() -> Path:
+    return Path(os.getenv("VITALGUARD_MODEL_ARTIFACT", str(DEFAULT_ARTIFACT_DIR)))
+
+
+@lru_cache(maxsize=1)
 def evaluate_synthetic_holdout() -> dict[str, object]:
     rows, labels = _training_data(seed=20261010, samples=12000)
     x_train, x_test, y_train, y_test = train_test_split(
@@ -64,8 +86,9 @@ def evaluate_synthetic_holdout() -> dict[str, object]:
 
 def coefficient_contributions(values: dict[str, float]) -> list[dict[str, object]]:
     """Return additive standardized-log-odds contributions for logistic regression."""
-    scaler = MODEL.named_steps["scale"]
-    classifier = MODEL.named_steps["classifier"]
+    pipeline = active_model().pipeline
+    scaler = pipeline.named_steps["scale"]
+    classifier = pipeline.named_steps["classifier"]
     row = np.array([[values[name] for name in FEATURES]], dtype=float)
     standardized = scaler.transform(row)[0]
     contributions = standardized * classifier.coef_[0]

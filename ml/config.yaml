@@ -1,0 +1,108 @@
+# VitalGuard AI — versioned ML pipeline configuration.
+#
+# Everything that defines a training run lives here and is hashed into the run's
+# manifest: feature definitions, target, prediction times, inclusion criteria,
+# split, model search, threshold policy and evaluation settings. Experiments
+# below override these defaults. Change `config_version` when a definition changes.
+config_version: 1
+
+# Order and names must equal backend/app/model.py FEATURES; units are canonical
+# after conversion. Values outside valid_range are treated as invalid (missing).
+# lookback_hours: the most recent value measured at or before the prediction
+# time within this window is used; nothing measured later is ever used.
+features:
+  - {name: age, unit: years, valid_range: [18, 110]}
+  - {name: heart_rate, unit: beats/min, valid_range: [20, 250], lookback_hours: 4}
+  - {name: spo2, unit: "%", valid_range: [50, 100], lookback_hours: 4}
+  - {name: systolic_bp, unit: mmHg, valid_range: [50, 280], lookback_hours: 4}
+  - {name: diastolic_bp, unit: mmHg, valid_range: [20, 180], lookback_hours: 4}
+  - {name: temperature, unit: degC, valid_range: [30, 45], lookback_hours: 8}
+  - {name: respiratory_rate, unit: breaths/min, valid_range: [3, 70], lookback_hours: 4}
+
+target:
+  id: inhospital-death-within-24h-v1
+  description: >-
+    1 if in-hospital death (admissions.deathtime) occurs after the prediction
+    time and no more than 24 hours after it; otherwise 0. Patients discharged
+    alive are 0 (deaths after discharge are not observed).
+  outcome_window_hours: 24
+
+# One prediction every stride_hours during each ICU stay, starting
+# first_prediction_hours after ICU admission and ending at ICU discharge or death.
+prediction_times:
+  first_prediction_hours: 4
+  stride_hours: 4
+  max_per_stay: 42
+
+inclusion:
+  min_age: 18
+  # Rows are kept only if every feature has a valid value available at the
+  # prediction time (complete case); missingness is reported before exclusion.
+  require_all_features: true
+
+split:
+  # patient_hash: stable per-patient assignment from SHA-256(seed:patient_id).
+  # patient_group: patients whose split_group is in test_groups form the test set
+  #   (for MIMIC-IV, anchor_year_group approximates a temporal split); the rest
+  #   are hashed into train/validation.
+  strategy: patient_hash
+  seed: 20261014
+  fractions: {train: 0.70, validation: 0.15, test: 0.15}
+  test_groups: []
+
+model:
+  name: logreg-baseline
+  # Same structure as the deployed demo model: StandardScaler + LogisticRegression.
+  c_grid: [0.01, 0.1, 1.0, 10.0]
+  class_weight: balanced
+  max_iter: 2000
+  random_state: 42
+  # Chosen on the validation split only; the test split is never used for selection.
+  selection_metric: average_precision
+
+threshold:
+  # Highest threshold reaching this sensitivity on the validation split.
+  strategy: target_sensitivity
+  target_sensitivity: 0.80
+
+evaluation:
+  bootstrap_samples: 200
+  bootstrap_seed: 7
+  calibration_bins: 10
+
+reproducibility:
+  abs_tolerance: 1.0e-9
+
+experiments:
+  # The deployed API's model: generated data, heuristic labels, no patients.
+  # Writes the committed artifact used by the backend.
+  synthetic_demo:
+    source: synthetic-demo
+    dataset_kind: synthetic-demo
+    output_dir: backend/app/model_artifacts/synthetic-logreg-0.1.0
+
+  # Fictional data in MIMIC-IV table layout. Exercises the real-data code path
+  # end to end; its metrics are meaningless and must never be reported as performance.
+  mimic_format_fixture:
+    source: mimic-iv-format
+    dataset_kind: synthetic-fixture
+    data_dir: ml/data/fixtures/synthetic-mimic-format
+    fixture: {patients: 400, seed: 11}
+
+  # MIMIC-IV v3.x (PhysioNet credentialed access, data use agreement required).
+  # BLOCKED here: no approved access. Point MIMIC_IV_DIR at your own approved copy.
+  mimic_iv:
+    source: mimic-iv-format
+    dataset_kind: approved-clinical
+    data_dir_env: MIMIC_IV_DIR
+    requires_access_confirmation: true
+    split:
+      strategy: patient_group
+      test_groups: ["2017 - 2019"]
+
+  # Openly downloadable MIMIC-IV Clinical Database Demo (100 patients) — useful for
+  # schema checks only; far too small for performance estimates. Not downloaded here.
+  mimic_iv_demo:
+    source: mimic-iv-format
+    dataset_kind: public-demo
+    data_dir_env: MIMIC_IV_DEMO_DIR

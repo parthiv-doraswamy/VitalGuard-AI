@@ -1,0 +1,97 @@
+{
+  "clinically_validated": false,
+  "created_at": "2026-10-14T12:58:27.119328+00:00",
+  "dataset": {
+    "description": "generated synthetic observations only",
+    "id": "synthetic-demo-seed20261010-n12000",
+    "kind": "synthetic-demo",
+    "label_definition": "synthetic heuristic score plus seeded noise >= 35",
+    "source": "backend/app/synthetic_data.py",
+    "synthetic_fixture": false
+  },
+  "features": [
+    "age",
+    "heart_rate",
+    "spo2",
+    "systolic_bp",
+    "diastolic_bp",
+    "temperature",
+    "respiratory_rate"
+  ],
+  "format": "vitalguard-model-artifact",
+  "format_version": 1,
+  "intended_use": "software demonstration only \u2014 synthetic data, not a clinical model",
+  "library_versions": {
+    "joblib": "1.6.0",
+    "numpy": "2.5.3",
+    "python": "3.14.7",
+    "scikit_learn": "1.9.1"
+  },
+  "model_file": "model.joblib",
+  "model_sha256": "41eee2c45d68c8e5f2ee065a568d37e8b73b78471483c21c1315b738d0d0766e",
+  "model_version": "synthetic-logreg-0.1.0",
+  "reference_inputs": [
+    [
+      58,
+      82,
+      98,
+      122,
+      78,
+      37.0,
+      16
+    ],
+    [
+      67,
+      118,
+      91,
+      96,
+      58,
+      38.4,
+      25
+    ],
+    [
+      80,
+      140,
+      85,
+      84,
+      48,
+      39.3,
+      32
+    ],
+    [
+      35,
+      64,
+      99,
+      134,
+      86,
+      36.6,
+      12
+    ],
+    [
+      72,
+      101,
+      94,
+      108,
+      66,
+      37.8,
+      21
+    ]
+  ],
+  "reference_probabilities": [
+    0.1881271610375106,
+    0.9496291277729242,
+    0.998240802186283,
+    0.05514073374107151,
+    0.7519543946834311
+  ],
+  "training": {
+    "algorithm": "StandardScaler + LogisticRegression",
+    "config_sha256": "c1759061ef3a037b478aa48b4ddc14c9a4786fdcb5a0ae1be00457c95a10b687",
+    "experiment": "synthetic_demo",
+    "fitted_on": "all generated rows",
+    "git_commit": "7771aa0767c1e6d7a288747e4d20380b47d5ee86",
+    "random_state": 42,
+    "run_id": "0de4e5e8-f2c7-4811-8401-b8a429eecf9a",
+    "seed": 20261010
+  }
+}

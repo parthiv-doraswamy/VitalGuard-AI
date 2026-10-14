@@ -41,3 +41,6 @@ PostgreSQL required on hosted deployments (`VITALGUARD_REQUIRE_POSTGRES`), poole
 
 ## Synchronized two-laptop streaming (delivered on `feature/live-demo-backend`)
 Backend stream sessions, with producer ownership tokens and a single active producer. Laptop A requests observations by sequence; the backend generates them with the existing simulator, scores and persists them, and broadcasts each one after commit. Sequences are idempotent, and missed events can be caught up through `/api/v1/live-demo/events`. Requires migration v4. The frontend is on `feature/live-demo-frontend`. See the backend README and the main-branch roadmap.
+
+## Reproducible ML pipeline (delivered on `feature/ml-pipeline`)
+The API now loads a versioned, verified artifact instead of training at import. `ml/` contains dataset preparation (MIMIC-IV format, leakage-safe as-of features, patient-level and temporal splits), baseline training with validation-only model and threshold selection, held-out evaluation, and tests. **Real-dataset training is blocked: there is no approved MIMIC-IV/eICU access.** Every result so far comes from synthetic or fictional fixture data and is not a clinical performance claim. See [ml/README.md](../ml/README.md) and [ml/data/README.md](../ml/data/README.md).

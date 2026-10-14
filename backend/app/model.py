@@ -1,15 +1,31 @@
-"""A reproducible scikit-learn model trained only on generated demo data.
+"""Active risk model for the VitalGuard demo API.
 
-This module deliberately does not load patient records or external datasets.
-Its labels are generated from a transparent heuristic solely to exercise the
-end-to-end software workflow. It is not a clinical model.
+The API serves a pre-built, versioned artifact (see model_artifact.py and ml/)
+and never trains during import. The default artifact is the synthetic demo
+model, trained only on generated data with heuristic labels; it is not a
+clinical model.
+
+Fallback: if the artifact is missing or fails verification, the synthetic demo
+model is rebuilt deterministically in-process (identical to the artifact) and
+/api/v1/model/info reports model_source="fallback-synthetic-training". Set
+VITALGUARD_MODEL_REQUIRE_ARTIFACT=true to fail instead of falling back.
 """
 from __future__ import annotations
+
+import logging
+import os
+import threading
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
+from .model_artifact import ArtifactError, load_artifact
+from .synthetic_data import training_data
 
 FEATURES = (
     "age",
@@ -20,44 +36,22 @@ FEATURES = (
     "temperature",
     "respiratory_rate",
 )
+# Version of the synthetic demo model; the active version comes from the loaded artifact.
 MODEL_VERSION = "synthetic-logreg-0.1.0"
+DEFAULT_ARTIFACT_DIR = Path(__file__).resolve().parent / "model_artifacts" / MODEL_VERSION
+# Only synthetic models may be served by this demo unless an operator explicitly opts in.
+DEMO_DATASET_KINDS = {"synthetic-demo"}
 
-
-def _heuristic_score(rows: np.ndarray) -> np.ndarray:
-    age, hr, spo2, sys, dia, temp, rr = rows.T
-    score = np.zeros(len(rows), dtype=float)
-    score += np.clip(np.abs(hr - 82) - 12, 0, 70) * 0.55
-    score += np.clip(96 - spo2, 0, 30) * 4.4
-    score += np.clip(105 - sys, 0, 80) * 0.72
-    score += np.clip(rr - 18, 0, 35) * 1.5
-    score += np.clip(12 - rr, 0, 12) * 1.8
-    score += np.clip(np.abs(temp - 37) - 0.5, 0, 5) * 10
-    score += np.clip(age - 65, 0, 45) * 0.18
-    score += np.clip(55 - dia, 0, 35) * 0.3
-    return np.clip(score, 0, 100)
+logger = logging.getLogger("vitalguard.model")
 
 
 def _training_data(seed: int = 20261010, samples: int = 12000):
-    rng = np.random.default_rng(seed)
-    rows = np.column_stack(
-        [
-            rng.integers(18, 101, samples),
-            rng.normal(84, 22, samples).clip(35, 190),
-            rng.normal(96, 3.2, samples).clip(75, 100),
-            rng.normal(122, 22, samples).clip(65, 220),
-            rng.normal(76, 13, samples).clip(35, 130),
-            rng.normal(37.0, 1.0, samples).clip(34, 42),
-            rng.normal(17, 6, samples).clip(5, 42),
-        ]
-    )
-    heuristic = _heuristic_score(rows)
-    # A small noise term prevents an unrealistically perfect synthetic boundary.
-    labels = ((heuristic + rng.normal(0, 7, samples)) >= 35).astype(int)
-    return rows, labels
+    return training_data(seed=seed, samples=samples)
 
 
 def build_model() -> Pipeline:
-    rows, labels = _training_data()
+    """Train the synthetic demo pipeline (used by ml/ and as the documented fallback)."""
+    rows, labels = training_data()
     model = Pipeline(
         [
             ("scale", StandardScaler()),
@@ -75,12 +69,60 @@ def build_model() -> Pipeline:
     return model
 
 
-MODEL = build_model()
+@dataclass(frozen=True)
+class ActiveModel:
+    pipeline: Pipeline
+    version: str
+    source: str
+    manifest: dict[str, Any] | None = None
+    load_error: str | None = None
+    info: dict[str, Any] = field(default_factory=dict)
+
+
+_ACTIVE: ActiveModel | None = None
+_LOCK = threading.Lock()
+
+
+def _flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes"}
+
+
+def _load() -> ActiveModel:
+    directory = Path(os.getenv("VITALGUARD_MODEL_ARTIFACT", str(DEFAULT_ARTIFACT_DIR)))
+    try:
+        pipeline, manifest = load_artifact(directory, FEATURES, os.getenv("VITALGUARD_MODEL_SHA256") or None)
+        kind = manifest.get("dataset", {}).get("kind")
+        if kind not in DEMO_DATASET_KINDS and not _flag("VITALGUARD_ALLOW_NON_DEMO_MODEL"):
+            raise ArtifactError(f"Artifact dataset kind '{kind}' is not allowed in the demo API")
+        return ActiveModel(pipeline=pipeline, version=manifest["model_version"], source="artifact", manifest=manifest)
+    except ArtifactError as exc:
+        if _flag("VITALGUARD_MODEL_REQUIRE_ARTIFACT"):
+            raise
+        logger.warning("Model artifact unavailable (%s); rebuilding the synthetic demo model in-process", exc)
+        return ActiveModel(pipeline=build_model(), version=MODEL_VERSION,
+                           source="fallback-synthetic-training", load_error=str(exc))
+
+
+def active_model() -> ActiveModel:
+    """Return the loaded model, loading (or falling back) once per process."""
+    global _ACTIVE
+    if _ACTIVE is None:
+        with _LOCK:
+            if _ACTIVE is None:
+                _ACTIVE = _load()
+    return _ACTIVE
+
+
+def reset_active_model() -> None:
+    """Forget the loaded model so the next call reloads it (tests and operators)."""
+    global _ACTIVE
+    with _LOCK:
+        _ACTIVE = None
 
 
 def predict_probability(values: dict[str, float]) -> float:
     row = np.array([[values[name] for name in FEATURES]], dtype=float)
-    return float(MODEL.predict_proba(row)[0, 1])
+    return float(active_model().pipeline.predict_proba(row)[0, 1])
 
 
 def explain(values: dict[str, float]) -> list[dict[str, object]]:
