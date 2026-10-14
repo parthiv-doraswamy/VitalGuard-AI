@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const routes = [
   { path: '/#/dashboard', heading: 'Patient Monitoring Overview' },
@@ -10,7 +10,7 @@ const routes = [
 
 // Protected workspaces correctly redirect unauthenticated visitors to /login.
 // Sign in through the same documented demo flow a reviewer uses in the UI.
-async function signInAsDemoAdmin(page: Page) {
+async function signInAsDemoAdmin(page) {
   await page.goto('/#/login');
   await page.getByRole('button', { name: /Admin/ }).click();
   await page.getByRole('button', { name: 'Open demo workspace' }).click();
