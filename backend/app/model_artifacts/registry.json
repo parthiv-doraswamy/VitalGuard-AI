@@ -1,0 +1,14 @@
+{
+  "format": "vitalguard-model-registry",
+  "active": "synthetic-logreg-0.1.0",
+  "previous": null,
+  "history": [
+    {
+      "action": "promote",
+      "version": "synthetic-logreg-0.1.0",
+      "dataset_kind": "synthetic-demo",
+      "note": "Synthetic demo model; no validated research model is available.",
+      "at": "2026-10-14T00:00:00+00:00"
+    }
+  ]
+}
