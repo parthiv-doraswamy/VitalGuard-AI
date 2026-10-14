@@ -56,6 +56,9 @@ def insert_alert(connection: Connection, *, patient_id: str, event_key: str, sev
     row = connection.execute(select(alerts).where(alerts.c.id == result.inserted_primary_key[0])).mappings().one()
     _audit(connection, str(row["id"]), "created", "demo-system", {"severity": severity, "event_key": event_key})
     alert = _serialize(row)
+    # Push deliveries are queued in this same transaction: they exist only if the alert commits.
+    from .notification_service import enqueue_for_alert
+    enqueue_for_alert(connection, alert)
     if emit_event:
         record_event(connection, "alert.created", alert_created_event(alert, details.get("observation_id")),
                      aggregate_id=alert["id"])

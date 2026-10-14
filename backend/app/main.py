@@ -19,11 +19,22 @@ from .trend_routes import router as trend_router
 from .alert_routes import router as alert_router
 from .data_quality import assess_observations
 from .event_broker import events, events_after, sequence_bounds
+from .notification_routes import router as notification_router
+from .notification_service import NotificationError, notifications
 from .live_events import hub
 from .observation_service import record_observation
 from .storage import database_health, dispose_engines, initialize_storage, list_observations
 
 logger = logging.getLogger("vitalguard.api")
+
+# Uvicorn configures only its own loggers; without this, the app's diagnostic INFO lines
+# (push delivery outcomes, broker reconnects) would be silently dropped in production.
+_app_logger = logging.getLogger("vitalguard")
+_app_logger.setLevel(os.getenv("VITALGUARD_LOG_LEVEL", "INFO").upper())
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    _app_logger.addHandler(_handler)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -33,9 +44,11 @@ async def lifespan(_app: FastAPI):
     active_model()
     # Cross-instance event delivery (PostgreSQL LISTEN/NOTIFY) or explicit single-instance mode.
     await events.start()
+    await notifications.start()
     try:
         yield
     finally:
+        await notifications.stop()
         await events.stop()
         dispose_engines()
 
@@ -43,6 +56,7 @@ app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
 app.include_router(simulator_router)
 app.include_router(live_router)
+app.include_router(notification_router)
 app.include_router(alert_router)
 app.include_router(timeline_router)
 app.include_router(trend_router)
@@ -52,11 +66,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     # Frontend API requests can carry the demo bearer token. Browsers preflight
     # those POSTs; omitting Authorization makes the browser reject them before
     # the request reaches the API.
-    allow_headers=["Accept", "Authorization", "Content-Type", "X-Producer-Token", "X-Demo-Producer-Key"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Producer-Token", "X-Demo-Producer-Key", "X-Subscription-Token"],
 )
 
 @app.middleware("http")
@@ -87,6 +101,10 @@ async def database_error(request: Request, exc: SQLAlchemyError):
     return JSONResponse(status_code=503, content={"detail": "Database unavailable; the request was not saved.",
         "error": "database_unavailable", "demo_only": True})
 
+@app.exception_handler(NotificationError)
+async def notification_error(_request: Request, exc: NotificationError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "error": exc.code, "demo_only": True})
+
 @app.exception_handler(StreamError)
 async def stream_error(_request: Request, exc: StreamError):
     return JSONResponse(status_code=exc.status_code,
@@ -113,7 +131,7 @@ def health():
     degraded = database["status"] != "ok" or broker["status"] != "ok"
     return {"status": "degraded" if degraded else "ok", "model_version": active_model().version,
         "components": {"api": {"status": "ok", "instance_id": broker["instance_id"]}, "database": database,
-                       "event_broker": broker},
+                       "event_broker": broker, "web_push": notifications.health()},
         "database": database, "event_broker": broker, "websocket": "available", "demo_only": True}
 
 @app.get("/health/live")

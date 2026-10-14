@@ -233,6 +233,9 @@ class Dispatcher:
     async def _send(self, event: dict[str, Any]) -> dict[str, Any]:
         event = {**event, "published_at": datetime.now(timezone.utc).isoformat()}
         await hub.broadcast(event)
+        if event.get("type") == "alert.created":
+            from .notification_service import notifications
+            notifications.wake()  # queued push deliveries for this alert are now committed
         self.delivered += 1
         self.last_dispatch_at = event["published_at"]
         return event

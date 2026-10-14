@@ -112,3 +112,35 @@ class ModelInfo(BaseModel):
     artifact: ModelArtifactInfo | None = None
     load_error: str | None = None
     supports_coefficient_contributions: bool
+
+
+class PushSubscriptionKeys(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    p256dh: str = Field(min_length=80, max_length=120)
+    auth: str = Field(min_length=16, max_length=40)
+
+
+class PushSubscriptionInfo(BaseModel):
+    """The browser's PushSubscription.toJSON() (expirationTime is accepted and ignored)."""
+    model_config = ConfigDict(extra="ignore")
+    endpoint: str = Field(min_length=10, max_length=1024)
+    keys: PushSubscriptionKeys
+
+
+class PushRegistration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    subscription: PushSubscriptionInfo
+    min_severity: Literal["high", "critical"] = "high"
+
+
+class PushPreferences(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool | None = None
+    min_severity: Literal["high", "critical"] | None = None
+
+
+class PushReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    delivery_id: int = Field(ge=1)
+    nonce: str = Field(min_length=8, max_length=64)
+    event: Literal["displayed", "clicked"]

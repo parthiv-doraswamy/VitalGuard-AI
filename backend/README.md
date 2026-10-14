@@ -63,6 +63,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/risk/predict \
 
 Live events are written to a transactional outbox and delivered to clients on every backend instance through PostgreSQL `LISTEN/NOTIFY`. With SQLite the API runs in explicit single-instance mode. `GET /api/v1/events?after_seq=…` recovers missed events; `/health` reports API, database and event broker separately (`/health/live`, `/health/ready` for orchestration). See [docs/SCALABILITY.md](../docs/SCALABILITY.md).
 
+Web Push for new demo alerts: `/api/v1/notifications/*` (config, device-scoped subscriptions, test sends, receipts). Requires VAPID keys in the private environment; see [docs/WEB_PUSH.md](../docs/WEB_PUSH.md).
+
 WebSocket `/api/v1/live` events: `observation.created` (event_id, session_id, sequence, timestamp, observation, model_version, prediction, alert, server_received_at, published_at, `demo_only`, `data_origin: "synthetic"`), `alert.created`, and `stream.state` (started/paused/resumed/stopped). Sending `{"type":"ping","client_time":<ms>}` returns a pong with `server_time` so clients can estimate clock offset.
 
 Optional settings: `VITALGUARD_STREAM_PRODUCER_KEY` requires a matching `X-Demo-Producer-Key` header to start a stream; `VITALGUARD_STREAM_IDLE_TIMEOUT_SECONDS` (default 120) lets an abandoned stream be replaced without takeover.

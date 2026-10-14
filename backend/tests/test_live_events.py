@@ -415,7 +415,7 @@ def test_health_reports_api_database_and_broker_separately(database):
             body = client.get("/health").json()
         ready = client.get("/health/ready")
         live = client.get("/health/live")
-    assert set(body["components"]) == {"api", "database", "event_broker"}
+    assert set(body["components"]) == {"api", "database", "event_broker", "web_push"}
     broker = body["event_broker"]
     if database == "postgresql":
         assert broker["mode"] == "postgres" and broker["cross_instance_delivery"] is True and broker["status"] == "ok"

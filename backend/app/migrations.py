@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, cast, func, insert, inspect, select, text, update
 from sqlalchemy.engine import Connection, Engine
 
-from .storage_schema import alerts, audit_events, event_outbox, metadata as _APP_METADATA, stream_sessions
+from .storage_schema import (alerts, audit_events, event_outbox, metadata as _APP_METADATA, push_deliveries,
+                             push_subscriptions, stream_sessions)
 
 _MIGRATION_METADATA = MetaData()
 MIGRATIONS = Table(
@@ -74,12 +75,21 @@ def _event_outbox(connection: Connection) -> None:
     _create_indexes(connection, {"idx_event_outbox_created", "idx_event_outbox_session_id"})
 
 
+def _web_push(connection: Connection) -> None:
+    """v6: Web Push subscriptions and the durable delivery queue."""
+    push_subscriptions.create(connection, checkfirst=True)
+    push_deliveries.create(connection, checkfirst=True)
+    _create_indexes(connection, {"idx_push_subscriptions_status", "idx_push_deliveries_due",
+                                 "idx_push_deliveries_subscription"})
+
+
 STEPS: tuple[tuple[int, str, Callable[[Connection], None]], ...] = (
     (1, "baseline_tables", _baseline_tables),
     (2, "history_indexes", _history_indexes),
     (3, "backfill_alert_timestamps", _backfill_alert_timestamps),
     (4, "live_stream_sessions", _live_stream_sessions),
     (5, "event_outbox", _event_outbox),
+    (6, "web_push", _web_push),
 )
 LATEST_VERSION = STEPS[-1][0]
 

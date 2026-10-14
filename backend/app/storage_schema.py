@@ -4,7 +4,7 @@ Every row in these tables is synthetic demonstration data. None of them is a
 medical record, and real patient data must never be written to them.
 """
 from sqlalchemy import (
-    BigInteger, Column, DateTime, Index, Integer, MetaData, String, Table, Text, func,
+    BigInteger, Boolean, Column, DateTime, Index, Integer, MetaData, String, Table, Text, UniqueConstraint, func,
 )
 
 metadata = MetaData()
@@ -109,5 +109,58 @@ event_outbox = Table(
 Index("idx_event_outbox_created", event_outbox.c.created_at)
 Index("idx_event_outbox_session_id", event_outbox.c.session_id, event_outbox.c.id)
 
+# Web Push: one row per browser subscription (device-scoped; there is no user identity yet).
+# The endpoint is a capability URL, so it is only ever logged by its hash; the management
+# token that proves ownership is stored only as a SHA-256 hash.
+push_subscriptions = Table(
+    "push_subscriptions", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("endpoint_hash", String(64), nullable=False, unique=True),
+    Column("endpoint", Text, nullable=False),
+    Column("p256dh", String(200), nullable=False),
+    Column("auth", String(100), nullable=False),
+    Column("token_hash", String(64), nullable=False),
+    Column("min_severity", String(16), nullable=False, server_default="high"),
+    Column("enabled", Boolean, nullable=False, server_default="1"),
+    Column("status", String(16), nullable=False, server_default="active"),
+    Column("receipt_base", String(300)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_success_at", DateTime(timezone=True)),
+    Column("last_failure_at", DateTime(timezone=True)),
+    Column("consecutive_failures", Integer, nullable=False, server_default="0"),
+    Column("expired_reason", String(80)),
+)
+Index("idx_push_subscriptions_status", push_subscriptions.c.status, push_subscriptions.c.enabled)
+
+# Durable delivery queue. Rows are created in the same transaction as the alert, so a
+# notification can only exist for a committed alert; (subscription_id, event_key) is
+# unique, so retries, duplicate alerts and multiple instances never send twice.
+push_deliveries = Table(
+    "push_deliveries", metadata,
+    Column("id", BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True),
+    Column("subscription_id", String(36), nullable=False),
+    Column("kind", String(16), nullable=False),
+    Column("event_key", String(160), nullable=False),
+    Column("alert_id", Integer),
+    Column("payload_json", Text, nullable=False),
+    Column("status", String(16), nullable=False, server_default="pending"),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("next_attempt_at", DateTime(timezone=True), nullable=False),
+    Column("locked_until", DateTime(timezone=True)),
+    Column("last_status_code", Integer),
+    Column("last_error", String(200)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("accepted_at", DateTime(timezone=True)),
+    Column("displayed_at", DateTime(timezone=True)),
+    Column("clicked_at", DateTime(timezone=True)),
+    UniqueConstraint("subscription_id", "event_key", name="uq_push_delivery_subscription_event"),
+    sqlite_autoincrement=True,
+)
+Index("idx_push_deliveries_due", push_deliveries.c.status, push_deliveries.c.next_attempt_at)
+Index("idx_push_deliveries_subscription", push_deliveries.c.subscription_id, push_deliveries.c.id)
+
 # Tables in foreign-key-safe order, used by migrations and backup/restore.
-APPLICATION_TABLES = (observations, patients, alerts, audit_events, stream_sessions, event_outbox)
+APPLICATION_TABLES = (observations, patients, alerts, audit_events, stream_sessions, event_outbox,
+                      push_subscriptions, push_deliveries)

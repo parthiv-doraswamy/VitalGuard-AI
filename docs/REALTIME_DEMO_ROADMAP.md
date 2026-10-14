@@ -50,3 +50,6 @@ Common model interface (load, validated predict, metadata, validate), a registry
 
 ## Cross-instance scaling (delivered on `feature/scale-out`)
 Transactional outbox (migration v5) and PostgreSQL `LISTEN/NOTIFY` delivery to WebSocket clients on every instance, with gap-aware ordered dispatch, `GET /api/v1/events` recovery, health split by component, bounded WebSockets and requests, and a load-test script. Verified with two real instances on one PostgreSQL database; load-tested on one laptop, with measured values and their limitations in [SCALABILITY.md](SCALABILITY.md). Not yet tested on Render with more than one instance.
+
+## Web Push notifications (delivered on `feature/web-push` + `feature/web-push-ui`)
+Device-scoped subscriptions, because there is no user identity yet. Deliveries are queued in the alert's own transaction and sent with VAPID by a claim-based worker with retries, expiry cleanup and device receipts; payloads carry no patient data. Real Chrome 155 on macOS received foreground and background pushes through FCM. Other platforms are untested. See [WEB_PUSH.md](WEB_PUSH.md).
