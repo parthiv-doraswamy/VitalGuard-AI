@@ -35,6 +35,7 @@ export interface ObservationHistory {
   count: number;
   limit: number;
   next_before_id: number | null;
+  next_after_id?: number | null;
   demo_only: true;
   disclaimer: string;
 }
@@ -62,9 +63,10 @@ export const api = {
   getLatestVitals: (id: string) => get(`/api/v1/patients/${encodeURIComponent(id)}/vitals/latest`),
   predictRisk: (input: RiskPredictionInput) =>
     request<RiskPredictionResult>('/api/v1/risk/predict', { method: 'POST', body: JSON.stringify(input) }),
-  listObservations: (patientId?: string, limit = 10) => {
+  listObservations: (patientId?: string, limit = 10, beforeId?: number) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (patientId) params.set('patient_id', patientId);
+    if (beforeId !== undefined) params.set('before_id', String(beforeId));
     return get<ObservationHistory>(`/api/v1/observations?${params.toString()}`);
   },
   health: () => get<{ status: string; model_version: string; demo_only: boolean }>('/health'),
