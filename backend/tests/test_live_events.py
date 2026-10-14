@@ -99,9 +99,12 @@ def test_receiver_gets_the_same_committed_event_as_the_producer(database):
 
     event = body["event"]
     assert body["duplicate"] is False
-    assert received == event
+    # Identical except published_at, which each instance stamps when it pushes to its own clients.
+    assert {k: v for k, v in received.items() if k != "published_at"} == {k: v for k, v in event.items() if k != "published_at"}
+    assert received["event_seq"] == event["event_seq"] and received["event_uuid"] == event["event_uuid"]
+    assert received["schema_version"] == 1
     for key in ("event_id", "session_id", "sequence", "timestamp", "observation", "model_version",
-                "prediction", "server_received_at", "published_at"):
+                "prediction", "server_received_at", "published_at", "emitted_at", "origin_instance"):
         assert received[key] is not None, key
     assert received["session_id"] == session_id and received["sequence"] == 0
     assert received["demo_only"] is True and received["data_origin"] == "synthetic"
@@ -316,3 +319,182 @@ def test_timed_ping_returns_server_time_for_clock_offset(client):
         error = websocket.receive_json()
     assert pong["type"] == "pong" and pong["client_time"] == 1234.5 and pong["server_time"]
     assert error["type"] == "error"
+
+
+# --- Transactional outbox, dispatcher and broker ----------------------------------------
+import asyncio
+import time as _time
+from app import event_broker
+from app.event_broker import Dispatcher, events, record_event
+from app.live_events import LiveEventHub
+from app.storage_schema import event_outbox
+
+ELEVATED_VITALS = {"patient_id": "DEMO-OUTBOX", "age": 70, "heart_rate": 180, "spo2": 78, "systolic_bp": 80,
+                   "diastolic_bp": 50, "temperature": 39.5, "respiratory_rate": 34}
+
+
+def test_outbox_rows_commit_atomically_with_the_data(database, monkeypatch):
+    with TestClient(app) as client:
+        assert client.post("/api/v1/risk/predict", json=ELEVATED_VITALS).status_code == 200
+        assert _count(event_outbox) == 2  # observation.created + alert.created
+        monkeypatch.setattr(observation_service, "insert_alert",
+                            lambda *a, **k: (_ for _ in ()).throw(OperationalError("x", {}, Exception("down"))))
+        assert client.post("/api/v1/risk/predict", json=ELEVATED_VITALS).status_code == 503
+    assert _count(event_outbox) == 2 and _count(observations) == 1
+
+
+def test_each_committed_event_is_delivered_once_despite_repeated_wakeups(database):
+    with TestClient(app) as client, client.websocket_connect("/api/v1/live") as receiver:
+        receiver.receive_json()
+        client.post("/api/v1/risk/predict", json={**ELEVATED_VITALS, "spo2": 97, "heart_rate": 80, "systolic_bp": 120,
+                                                  "diastolic_bp": 75, "temperature": 37, "respiratory_rate": 16})
+        first = receive_type(receiver, "observation.created")
+        for _ in range(3):  # duplicate notifications / polls
+            assert client.portal.call(events.after_commit) == []
+        assert_no_pending_events(receiver)
+    assert first["event_seq"] > 0 and len(first["event_uuid"]) == 36
+
+
+def test_recovery_endpoint_returns_every_event_type_in_order(database):
+    with TestClient(app) as client:
+        session_id, token = start_stream(client)
+        emits = [emit(client, session_id, token, sequence).json()["event"] for sequence in range(8)]
+        alert_id = client.get("/api/v1/alerts", params={"limit": 1}).json()["items"][0]["id"]
+        client.post(f"/api/v1/alerts/{alert_id}/acknowledge", json={"actor": "demo-nurse"})
+        client.post(f"{LIVE}/sessions/{session_id}/stop", headers={"X-Producer-Token": token})
+        page = client.get("/api/v1/events", params={"after_seq": 0, "limit": 500}).json()
+        filtered = client.get("/api/v1/events", params={"after_seq": emits[3]["event_seq"], "session_id": session_id}).json()
+    sequences = [item["event_seq"] for item in page["items"]]
+    assert sequences == sorted(sequences) and len(set(sequences)) == len(sequences)
+    types = [item["type"] for item in page["items"]]
+    assert types[0] == "stream.state" and types[-1] == "stream.state"
+    assert {"observation.created", "alert.created", "alert.updated"} <= set(types)
+    assert [item["event_seq"] for item in page["items"] if item["type"] == "observation.created"] == [e["event_seq"] for e in emits]
+    assert all(item["schema_version"] == 1 and item["event_uuid"] for item in page["items"])
+    assert all(item["event_seq"] > emits[3]["event_seq"] for item in filtered["items"])
+    assert page["history_truncated"] is False and page["latest_seq"] == sequences[-1]
+
+
+def test_recovery_reports_pruned_history(database):
+    with TestClient(app) as client:
+        for _ in range(3):
+            client.post("/api/v1/risk/predict", json=ELEVATED_VITALS)
+        assert event_broker.prune_outbox(retention_hours=-1) == 6
+        client.post("/api/v1/risk/predict", json=ELEVATED_VITALS)
+        page = client.get("/api/v1/events", params={"after_seq": 1}).json()
+    assert page["history_truncated"] is True and page["oldest_available_seq"] > 2
+
+
+def test_retried_sequence_returns_the_original_envelope(database):
+    with TestClient(app) as client:
+        session_id, token = start_stream(client)
+        original = emit(client, session_id, token, 0).json()["event"]
+        retried = emit(client, session_id, token, 0).json()
+    assert retried["duplicate"] is True
+    assert retried["event"]["event_seq"] == original["event_seq"] and retried["event"]["event_uuid"] == original["event_uuid"]
+
+
+def test_alert_transitions_are_broadcast(database):
+    with TestClient(app) as client, client.websocket_connect("/api/v1/live") as receiver:
+        receiver.receive_json()
+        client.post("/api/v1/risk/predict", json=ELEVATED_VITALS)
+        alert = receive_type(receiver, "alert.created")["alert"]
+        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", json={"actor": "demo-nurse"})
+        updated = receive_type(receiver, "alert.updated")
+        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", json={"actor": "demo-nurse"})  # no change, no event
+        assert_no_pending_events(receiver)
+    assert updated["alert"]["status"] == "acknowledged" and updated["action"] == "acknowledge"
+
+
+def test_health_reports_api_database_and_broker_separately(database):
+    with TestClient(app) as client:
+        deadline = _time.time() + 10
+        body = client.get("/health").json()
+        while database == "postgresql" and not body["event_broker"]["listener_connected"] and _time.time() < deadline:
+            _time.sleep(0.1)
+            body = client.get("/health").json()
+        ready = client.get("/health/ready")
+        live = client.get("/health/live")
+    assert set(body["components"]) == {"api", "database", "event_broker"}
+    broker = body["event_broker"]
+    if database == "postgresql":
+        assert broker["mode"] == "postgres" and broker["cross_instance_delivery"] is True and broker["status"] == "ok"
+    else:
+        assert broker["mode"] == "memory" and broker["cross_instance_delivery"] is False and broker["note"]
+    assert body["status"] == "ok" and ready.status_code == 200 and live.status_code == 200
+
+
+def test_postgres_broker_cannot_be_forced_onto_sqlite(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "x.sqlite3"))
+    monkeypatch.setenv("VITALGUARD_EVENT_BROKER", "postgres")
+    with pytest.raises(RuntimeError, match="requires DATABASE_URL"):
+        with TestClient(app):
+            pass
+
+
+def test_websocket_connections_are_capped_per_instance(client, monkeypatch):
+    monkeypatch.setenv("VITALGUARD_MAX_WEBSOCKETS", "1")
+    with client.websocket_connect("/api/v1/live") as first:
+        assert first.receive_json()["type"] == "connected"
+        with client.websocket_connect("/api/v1/live") as second:
+            assert second.receive_json()["detail"].startswith("Live channel is at capacity")
+
+
+def test_a_slow_client_is_dropped_without_delaying_others(monkeypatch):
+    monkeypatch.setenv("VITALGUARD_WEBSOCKET_SEND_TIMEOUT_SECONDS", "0.2")
+
+    class Client:
+        def __init__(self, delay):
+            self.delay, self.received = delay, []
+
+        async def send_json(self, event):
+            await asyncio.sleep(self.delay)
+            self.received.append(event)
+
+    async def scenario():
+        hub = LiveEventHub()
+        fast, slow = Client(0), Client(5)
+        hub._clients.update({fast, slow})
+        started = _time.perf_counter()
+        await hub.broadcast({"type": "x"})
+        return fast, slow, hub, _time.perf_counter() - started
+
+    fast, slow, hub, elapsed = asyncio.run(scenario())
+    assert fast.received == [{"type": "x"}] and slow.received == []
+    assert hub.client_count() == 1 and hub.dropped_clients == 1 and elapsed < 1
+
+
+@pytest.mark.parametrize("database", ["postgresql"], indirect=True)
+def test_out_of_order_commits_and_rolled_back_ids_are_handled(database, monkeypatch):
+    monkeypatch.setenv("VITALGUARD_EVENT_GAP_TIMEOUT_SECONDS", "0.3")
+    with TestClient(app) as client, client.websocket_connect("/api/v1/live") as receiver:
+        receiver.receive_json()
+        engine = get_engine()
+        slow = engine.connect()
+        slow_tx = slow.begin()
+        late = record_event(slow, "test.late", {"type": "test.late"})          # id N, not yet committed
+        with engine.begin() as connection:
+            early = record_event(connection, "test.early", {"type": "test.early"})  # id N+1, committed first
+        client.portal.call(events.after_commit)
+        assert receive_type(receiver, "test.early")["event_seq"] == early["event_seq"]
+        assert late["event_seq"] in events.dispatcher.gaps
+        slow_tx.commit()
+        slow.close()
+        client.portal.call(events.after_commit)
+        assert receive_type(receiver, "test.late")["event_seq"] == late["event_seq"]
+        assert events.dispatcher.late_deliveries >= 1
+
+        rolled = engine.connect()
+        rolled_tx = rolled.begin()
+        record_event(rolled, "test.rolled_back", {"type": "test.rolled_back"})
+        rolled_tx.rollback()
+        rolled.close()
+        with engine.begin() as connection:
+            record_event(connection, "test.after", {"type": "test.after"})
+        client.portal.call(events.after_commit)
+        receive_type(receiver, "test.after")
+        _time.sleep(0.4)
+        client.portal.call(events.after_commit)
+        assert events.dispatcher.gaps == {}  # rolled-back id expired, never delivered
+        assert_no_pending_events(receiver)

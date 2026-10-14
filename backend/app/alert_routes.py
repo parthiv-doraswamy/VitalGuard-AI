@@ -2,6 +2,8 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
+from .event_broker import events
 from .alert_service import MAX_AUDIT_EVENTS, get_alert, list_alerts, list_alert_audit, transition_alert
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
@@ -20,19 +22,21 @@ def get_alerts(status: Literal["open", "acknowledged", "resolved"] | None = None
             "next_before_id": items[-1]["id"] if len(items) == limit else None,
             "demo_only": True}
 
-@router.post("/{alert_id}/acknowledge")
-def acknowledge_alert(alert_id: int, payload: AlertAction):
-    result = transition_alert(alert_id, "acknowledge", payload.actor)
+async def _transition(alert_id: int, action: str, actor: str):
+    result = await run_in_threadpool(transition_alert, alert_id, action, actor)
     if result is None:
         raise HTTPException(status_code=404, detail="Alert not found")
+    # An alert.updated event was written to the outbox if the state changed.
+    await events.after_commit()
     return {"item": result, "demo_only": True}
 
+@router.post("/{alert_id}/acknowledge")
+async def acknowledge_alert(alert_id: int, payload: AlertAction):
+    return await _transition(alert_id, "acknowledge", payload.actor)
+
 @router.post("/{alert_id}/resolve")
-def resolve_alert(alert_id: int, payload: AlertAction):
-    result = transition_alert(alert_id, "resolve", payload.actor)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"item": result, "demo_only": True}
+async def resolve_alert(alert_id: int, payload: AlertAction):
+    return await _transition(alert_id, "resolve", payload.actor)
 
 @router.get("/{alert_id}/audit")
 def get_alert_audit(alert_id: int, limit: int = Query(default=100, ge=1, le=MAX_AUDIT_EVENTS)):

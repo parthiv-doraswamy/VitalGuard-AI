@@ -4,7 +4,7 @@ Every row in these tables is synthetic demonstration data. None of them is a
 medical record, and real patient data must never be written to them.
 """
 from sqlalchemy import (
-    Column, DateTime, Index, Integer, MetaData, String, Table, Text, func,
+    BigInteger, Column, DateTime, Index, Integer, MetaData, String, Table, Text, func,
 )
 
 metadata = MetaData()
@@ -89,5 +89,25 @@ audit_events = Table(
 Index("idx_audit_entity_created", audit_events.c.entity_type, audit_events.c.entity_id, audit_events.c.created_at.desc())
 Index("idx_audit_entity_id", audit_events.c.entity_type, audit_events.c.entity_id, audit_events.c.id)
 
+# Transactional outbox: every live event is written in the same transaction as the
+# data change it describes. `id` is the global event sequence used for ordering and
+# for missed-event recovery; the broker only signals that new rows exist.
+event_outbox = Table(
+    "event_outbox", metadata,
+    Column("id", BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True),
+    Column("event_uuid", String(36), nullable=False, unique=True),
+    Column("event_type", String(40), nullable=False),
+    Column("schema_version", Integer, nullable=False),
+    Column("session_id", String(36)),
+    Column("aggregate_id", String(64)),
+    Column("origin_instance", String(120), nullable=False),
+    Column("payload_json", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # SQLite would otherwise reuse ids after pruning, breaking "after_seq" recovery.
+    sqlite_autoincrement=True,
+)
+Index("idx_event_outbox_created", event_outbox.c.created_at)
+Index("idx_event_outbox_session_id", event_outbox.c.session_id, event_outbox.c.id)
+
 # Tables in foreign-key-safe order, used by migrations and backup/restore.
-APPLICATION_TABLES = (observations, patients, alerts, audit_events, stream_sessions)
+APPLICATION_TABLES = (observations, patients, alerts, audit_events, stream_sessions, event_outbox)

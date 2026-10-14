@@ -3,8 +3,8 @@ from typing import Literal
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
-from .live_events import hub
-from .observation_service import publish_committed, record_observation, utc_now
+from .event_broker import events
+from .observation_service import record_observation, utc_now
 from .schemas import RiskPrediction, StreamObservationRequest, StreamStartRequest
 from .simulator import observation_for_step
 from . import stream_service
@@ -26,10 +26,6 @@ async def submit_demo_observation(payload: SimulationRequest):
 
 
 live_router = APIRouter(prefix="/api/v1/live-demo", tags=["live-demo-stream"])
-
-
-async def _broadcast_state(action: str, session: dict) -> None:
-    await hub.broadcast({"type": "stream.state", "action": action, "session": session, "demo_only": True})
 
 
 @live_router.get("/config")
@@ -58,32 +54,31 @@ async def start_stream(payload: StreamStartRequest,
     session, token, replaced = await run_in_threadpool(stream_service.start_session,
         scenario=payload.scenario, patient_id=payload.patient_id, interval_ms=payload.interval_ms,
         takeover=payload.takeover, producer_key=x_demo_producer_key)
-    if replaced:
-        await _broadcast_state("stopped", replaced)
-    await _broadcast_state("started", session)
+    # stream.state events were written to the outbox in the same transaction.
+    await events.after_commit()
     return {"session": session, "producer_token": token, "replaced_session": replaced, "demo_only": True}
 
 
-async def _control(session_id: str, token: str | None, action: str, past: str):
+async def _control(session_id: str, token: str | None, action: str):
     session, changed = await run_in_threadpool(stream_service.control_session, session_id, token, action)
     if changed:
-        await _broadcast_state(past, session)
+        await events.after_commit()
     return {"session": session, "changed": changed, "demo_only": True}
 
 
 @live_router.post("/sessions/{session_id}/pause")
 async def pause_stream(session_id: str, x_producer_token: str | None = Header(default=None)):
-    return await _control(session_id, x_producer_token, "pause", "paused")
+    return await _control(session_id, x_producer_token, "pause")
 
 
 @live_router.post("/sessions/{session_id}/resume")
 async def resume_stream(session_id: str, x_producer_token: str | None = Header(default=None)):
-    return await _control(session_id, x_producer_token, "resume", "resumed")
+    return await _control(session_id, x_producer_token, "resume")
 
 
 @live_router.post("/sessions/{session_id}/stop")
 async def stop_stream(session_id: str, x_producer_token: str | None = Header(default=None)):
-    return await _control(session_id, x_producer_token, "stop", "stopped")
+    return await _control(session_id, x_producer_token, "stop")
 
 
 @live_router.post("/sessions/{session_id}/observations")
@@ -95,10 +90,10 @@ async def emit_stream_observation(session_id: str, payload: StreamObservationReq
     duplicate=true; no new record, alert or broadcast is created.
     """
     received_at = utc_now()
-    saved, alert, event, duplicate = await run_in_threadpool(stream_service.emit_observation,
+    event, duplicate = await run_in_threadpool(stream_service.emit_observation,
         session_id, x_producer_token, payload.sequence, received_at)
     if not duplicate:
-        event = await publish_committed(saved, alert, server_received_at=received_at)
+        await events.after_commit()
     return {"event": event, "duplicate": duplicate, "demo_only": True}
 
 

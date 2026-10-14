@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import os
 import uuid
@@ -17,6 +18,7 @@ from .timeline_routes import router as timeline_router
 from .trend_routes import router as trend_router
 from .alert_routes import router as alert_router
 from .data_quality import assess_observations
+from .event_broker import events, events_after, sequence_bounds
 from .live_events import hub
 from .observation_service import record_observation
 from .storage import database_health, dispose_engines, initialize_storage, list_observations
@@ -29,9 +31,12 @@ async def lifespan(_app: FastAPI):
     initialize_storage()
     # Load (never train) the verified model artifact before serving; falls back as documented in model.py.
     active_model()
+    # Cross-instance event delivery (PostgreSQL LISTEN/NOTIFY) or explicit single-instance mode.
+    await events.start()
     try:
         yield
     finally:
+        await events.stop()
         dispose_engines()
 
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
@@ -56,8 +61,13 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    """Attach baseline response headers and a server-generated request ID."""
-    response = await call_next(request)
+    """Attach baseline response headers and a server-generated request ID; bound request time."""
+    timeout = float(os.getenv("VITALGUARD_REQUEST_TIMEOUT_SECONDS", "30"))
+    try:
+        response = await asyncio.wait_for(call_next(request), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.error("Request timed out after %ss: %s %s", timeout, request.method, request.url.path)
+        response = JSONResponse(status_code=504, content={"detail": "Request timed out", "error": "timeout", "demo_only": True})
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -88,13 +98,53 @@ def root():
 
 @app.get("/health")
 def health():
+    """API, database and event-broker health, reported separately.
+
+    503 if the database is unreachable. 200 with status "degraded" if the event
+    broker cannot currently deliver across instances (data is still safe and
+    recoverable from GET /api/v1/events).
+    """
     try:
         database = database_health()
     except Exception as exc:
         logger.error("Database health check failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Database health check failed")
-    return {"status": "ok" if database["status"] == "ok" else "degraded", "model_version": active_model().version,
-        "database": database, "websocket": "available", "demo_only": True}
+    broker = events.health()
+    degraded = database["status"] != "ok" or broker["status"] != "ok"
+    return {"status": "degraded" if degraded else "ok", "model_version": active_model().version,
+        "components": {"api": {"status": "ok", "instance_id": broker["instance_id"]}, "database": database,
+                       "event_broker": broker},
+        "database": database, "event_broker": broker, "websocket": "available", "demo_only": True}
+
+@app.get("/health/live")
+def liveness():
+    """Process is up (no dependency checks)."""
+    return {"status": "ok"}
+
+@app.get("/health/ready")
+def readiness():
+    """Ready for traffic: database reachable. Broker problems degrade but do not block readiness."""
+    try:
+        database_health()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    return {"status": "ok", "event_broker": events.health()["status"]}
+
+@app.get("/api/v1/events")
+def committed_events(after_seq: int = Query(default=0, ge=0), session_id: str | None = Query(default=None, max_length=36),
+                     limit: int = Query(default=100, ge=1, le=500)):
+    """Committed live events after `after_seq`, oldest first: the recovery path after a reconnect.
+
+    Retention is bounded (VITALGUARD_EVENT_RETENTION_HOURS); history_truncated tells
+    the client that older events were pruned and a full REST reload is needed.
+    """
+    items = events_after(after_seq, limit, session_id)
+    oldest, newest = sequence_bounds()
+    return {"items": items, "count": len(items), "limit": limit,
+            "next_after_seq": items[-1]["event_seq"] if len(items) == limit else None,
+            "oldest_available_seq": oldest, "latest_seq": newest,
+            "history_truncated": oldest is not None and after_seq < oldest - 1,
+            "schema_version": 1, "demo_only": True}
 
 @app.websocket("/api/v1/live")
 async def live_socket(websocket: WebSocket):

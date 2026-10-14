@@ -47,3 +47,6 @@ The API now loads a versioned, verified artifact instead of training at import. 
 
 ## Model benchmarking and selection (delivered on `feature/model-benchmark`)
 Common model interface (load, validated predict, metadata, validate), a registry with automatic fallback to the previous artifact and manual promote/rollback, and a benchmark of logistic regression vs Random Forest vs XGBoost under identical splits. Predefined gates (deployability, latency, size, sensitivity, calibration) and a baseline-first selection rule, frozen before test evaluation. Run only on the fictional fixture, where the baseline was kept; the API stays in explicit synthetic-demo mode. See [ml/README.md](../ml/README.md).
+
+## Cross-instance scaling (delivered on `feature/scale-out`)
+Transactional outbox (migration v5) and PostgreSQL `LISTEN/NOTIFY` delivery to WebSocket clients on every instance, with gap-aware ordered dispatch, `GET /api/v1/events` recovery, health split by component, bounded WebSockets and requests, and a load-test script. Verified with two real instances on one PostgreSQL database; load-tested on one laptop, with measured values and their limitations in [SCALABILITY.md](SCALABILITY.md). Not yet tested on Render with more than one instance.

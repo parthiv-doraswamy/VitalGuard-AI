@@ -33,6 +33,7 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 from .alert_service import list_alerts_by_event_keys
+from .event_broker import event_for, record_event
 from .observation_service import observation_event, persist_observation, score_observation
 from .simulator import observation_for_step
 from .storage import get_engine, get_stream_observation, list_observations
@@ -119,11 +120,21 @@ def _authorize(row: Any, token: str | None) -> None:
         raise StreamError(403, "not_session_owner", "This browser does not own the stream session.")
 
 
-def _stop(connection: Connection, session_id: str, reason: str) -> None:
+def _state_event(connection: Connection, session_id: str, action: str) -> None:
+    """Record a stream.state event for the session's committed state, in the caller's transaction."""
+    session = public_session(_load(connection, session_id))
+    record_event(connection, "stream.state", {"type": "stream.state", "action": action, "session": session,
+                 "demo_only": True}, session_id=session_id, aggregate_id=session_id)
+
+
+def _stop(connection: Connection, session_id: str, reason: str) -> bool:
     now = _now()
-    connection.execute(update(stream_sessions).where(stream_sessions.c.id == session_id,
+    stopped = connection.execute(update(stream_sessions).where(stream_sessions.c.id == session_id,
         stream_sessions.c.status.in_(ACTIVE_STATUSES)).values(status="stopped", active_slot=None,
-        stopped_at=now, updated_at=now, stop_reason=reason))
+        stopped_at=now, updated_at=now, stop_reason=reason)).rowcount == 1
+    if stopped:
+        _state_event(connection, session_id, "stopped")
+    return stopped
 
 
 def current_session() -> dict[str, Any] | None:
@@ -160,6 +171,7 @@ def start_session(*, scenario: str, patient_id: str | None, interval_ms: int, ta
                 id=session_id, patient_id=patient_id or f"DEMO-STREAM-{session_id[:6].upper()}",
                 scenario=scenario, status="running", interval_ms=interval_ms, next_sequence=0,
                 token_hash=_hash(token), active_slot=1, created_at=now, updated_at=now))
+            _state_event(connection, session_id, "started")
             session = public_session(_load(connection, session_id))
     except IntegrityError:
         # Lost a race with a concurrent start for the single active slot.
@@ -175,8 +187,7 @@ def control_session(session_id: str, token: str | None, action: str) -> tuple[di
         row = _load(connection, session_id)
         _authorize(row, token)
         if action == "stop":
-            changed = row["status"] in ACTIVE_STATUSES
-            _stop(connection, session_id, "producer_stopped")
+            changed = _stop(connection, session_id, "producer_stopped")
         else:
             source, target = transitions[action]
             if row["status"] == "stopped":
@@ -184,12 +195,17 @@ def control_session(session_id: str, token: str | None, action: str) -> tuple[di
                                   session=public_session(row))
             changed = connection.execute(update(stream_sessions).where(stream_sessions.c.id == session_id,
                 stream_sessions.c.status == source).values(status=target, updated_at=_now())).rowcount == 1
+            if changed:
+                _state_event(connection, session_id, {"pause": "paused", "resume": "resumed"}[action])
         return public_session(_load(connection, session_id)), changed
 
 
 def _existing_event(session_id: str, sequence: int) -> dict[str, Any] | None:
+    """The original committed event for a sequence (same event_seq/event_uuid the receivers got)."""
     record = get_stream_observation(session_id, sequence)
-    return events_for_records([record])[0] if record else None
+    if not record:
+        return None
+    return event_for("observation.created", record["id"]) or events_for_records([record])[0]
 
 
 class _SequenceConflict(Exception):
@@ -201,15 +217,15 @@ _last_emit_lock = threading.Lock()
 
 
 def emit_observation(session_id: str, token: str | None, sequence: int,
-                     server_received_at: str) -> tuple[dict[str, Any], dict | None, dict[str, Any], bool]:
-    """Persist the observation for `sequence`. Returns (saved, alert, event, duplicate)."""
+                     server_received_at: str) -> tuple[dict[str, Any], bool]:
+    """Persist the observation for `sequence` with its outbox events. Returns (event, duplicate)."""
     with get_engine().connect() as connection:
         row = _load(connection, session_id)
     _authorize(row, token)
     if sequence < row["next_sequence"]:
         existing = _existing_event(session_id, sequence)
         if existing:
-            return {}, None, existing, True
+            return existing, True
     if row["status"] != "running":
         raise StreamError(409, f"session_{row['status']}", f"The stream session is {row['status']}.",
                           session=public_session(row))
@@ -238,16 +254,16 @@ def emit_observation(session_id: str, token: str | None, sequence: int,
             raise _SequenceConflict()
 
     try:
-        saved, alert = persist_observation(row["patient_id"], values, result, True,
-                                           session_id=session_id, sequence=sequence, within=advance)
+        _saved, _alert, event = persist_observation(row["patient_id"], values, result, True, session_id=session_id,
+                                                    sequence=sequence, within=advance, server_received_at=server_received_at)
     except (IntegrityError, _SequenceConflict):
         # A concurrent duplicate committed first, or the session was paused/stopped meanwhile.
         existing = _existing_event(session_id, sequence)
         if existing:
-            return {}, None, existing, True
+            return existing, True
         raise StreamError(409, "session_changed", "The stream session changed state; nothing was saved.",
                           session=get_session(session_id))
-    return saved, alert, observation_event(saved, alert, server_received_at=server_received_at), False
+    return event, False
 
 
 def events_for_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

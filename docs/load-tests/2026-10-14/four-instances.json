@@ -1,0 +1,347 @@
+{
+  "targets": [
+    "http://127.0.0.1:8801",
+    "http://127.0.0.1:8802",
+    "http://127.0.0.1:8803",
+    "http://127.0.0.1:8804"
+  ],
+  "health_at_start": {
+    "http://127.0.0.1:8801": {
+      "status": "ok",
+      "broker": "postgres",
+      "cross_instance_delivery": true,
+      "database": "postgresql"
+    },
+    "http://127.0.0.1:8802": {
+      "status": "ok",
+      "broker": "postgres",
+      "cross_instance_delivery": true,
+      "database": "postgresql"
+    },
+    "http://127.0.0.1:8803": {
+      "status": "ok",
+      "broker": "postgres",
+      "cross_instance_delivery": true,
+      "database": "postgresql"
+    },
+    "http://127.0.0.1:8804": {
+      "status": "ok",
+      "broker": "postgres",
+      "cross_instance_delivery": true,
+      "database": "postgresql"
+    }
+  },
+  "listeners_per_target": 1,
+  "duration_per_level_s": 15.0,
+  "mix": "70% POST /risk/predict, 30% GET /observations?limit=50",
+  "levels": [
+    {
+      "concurrent_users": 1,
+      "duration_s": 15.0,
+      "requests_ok": 3869,
+      "requests_failed": 0,
+      "errors_by_kind": {},
+      "throughput_rps": 258.0,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "predict": {
+          "p50": 3.77,
+          "p95": 4.19,
+          "p99": 4.84,
+          "count": 2681
+        },
+        "history": {
+          "p50": 3.66,
+          "p95": 3.89,
+          "p99": 4.16,
+          "count": 1188
+        }
+      },
+      "delivery": {
+        "observations_committed": 2681,
+        "received_by_every_listener": 2681,
+        "completeness": 1.0,
+        "p50_ms": 3.23,
+        "p95_ms": 3.58,
+        "p99_ms": 4.19,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 118.6,
+          "max_cpu_percent": 23.8
+        },
+        "pid47690": {
+          "max_rss_mb": 172.2,
+          "max_cpu_percent": 23.9
+        },
+        "pid48800": {
+          "max_rss_mb": 186.5,
+          "max_cpu_percent": 26.4
+        },
+        "pid48803": {
+          "max_rss_mb": 186.9,
+          "max_cpu_percent": 24.4
+        },
+        "max_db_connections": 20
+      }
+    },
+    {
+      "concurrent_users": 5,
+      "duration_s": 15.0,
+      "requests_ok": 8116,
+      "requests_failed": 0,
+      "errors_by_kind": {},
+      "throughput_rps": 541.2,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "predict": {
+          "p50": 9.03,
+          "p95": 14.84,
+          "p99": 20.37,
+          "count": 5638
+        },
+        "history": {
+          "p50": 7.21,
+          "p95": 11.31,
+          "p99": 20.81,
+          "count": 2478
+        }
+      },
+      "delivery": {
+        "observations_committed": 5638,
+        "received_by_every_listener": 5638,
+        "completeness": 1.0,
+        "p50_ms": 7.39,
+        "p95_ms": 12.11,
+        "p99_ms": 16.66,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 172.3,
+          "max_cpu_percent": 55.2
+        },
+        "pid47690": {
+          "max_rss_mb": 171.5,
+          "max_cpu_percent": 56.6
+        },
+        "pid48800": {
+          "max_rss_mb": 181.6,
+          "max_cpu_percent": 55.5
+        },
+        "pid48803": {
+          "max_rss_mb": 181.1,
+          "max_cpu_percent": 57.1
+        },
+        "max_db_connections": 23
+      }
+    },
+    {
+      "concurrent_users": 10,
+      "duration_s": 15.0,
+      "requests_ok": 8552,
+      "requests_failed": 0,
+      "errors_by_kind": {},
+      "throughput_rps": 570.1,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "predict": {
+          "p50": 17.4,
+          "p95": 26.66,
+          "p99": 35.59,
+          "count": 5991
+        },
+        "history": {
+          "p50": 14.26,
+          "p95": 21.43,
+          "p99": 31.88,
+          "count": 2561
+        }
+      },
+      "delivery": {
+        "observations_committed": 5991,
+        "received_by_every_listener": 5991,
+        "completeness": 1.0,
+        "p50_ms": 14.47,
+        "p95_ms": 22.53,
+        "p99_ms": 31.94,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 172.3,
+          "max_cpu_percent": 60.1
+        },
+        "pid47690": {
+          "max_rss_mb": 171.5,
+          "max_cpu_percent": 60.8
+        },
+        "pid48800": {
+          "max_rss_mb": 181.6,
+          "max_cpu_percent": 59.9
+        },
+        "pid48803": {
+          "max_rss_mb": 181.1,
+          "max_cpu_percent": 60.6
+        },
+        "max_db_connections": 25
+      }
+    },
+    {
+      "concurrent_users": 25,
+      "duration_s": 15.03,
+      "requests_ok": 6774,
+      "requests_failed": 0,
+      "errors_by_kind": {},
+      "throughput_rps": 450.7,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "predict": {
+          "p50": 47.57,
+          "p95": 120.44,
+          "p99": 179.15,
+          "count": 4772
+        },
+        "history": {
+          "p50": 41.79,
+          "p95": 110.52,
+          "p99": 165.88,
+          "count": 2002
+        }
+      },
+      "delivery": {
+        "observations_committed": 4772,
+        "received_by_every_listener": 4772,
+        "completeness": 1.0,
+        "p50_ms": 41.15,
+        "p95_ms": 113.78,
+        "p99_ms": 171.8,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 172.4,
+          "max_cpu_percent": 49.9
+        },
+        "pid47690": {
+          "max_rss_mb": 171.7,
+          "max_cpu_percent": 48.6
+        },
+        "pid48800": {
+          "max_rss_mb": 171.0,
+          "max_cpu_percent": 49.8
+        },
+        "pid48803": {
+          "max_rss_mb": 171.0,
+          "max_cpu_percent": 48.5
+        },
+        "max_db_connections": 26
+      }
+    },
+    {
+      "concurrent_users": 50,
+      "duration_s": 15.08,
+      "requests_ok": 4487,
+      "requests_failed": 0,
+      "errors_by_kind": {},
+      "throughput_rps": 297.6,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "predict": {
+          "p50": 132.89,
+          "p95": 408.49,
+          "p99": 582.79,
+          "count": 3196
+        },
+        "history": {
+          "p50": 127.06,
+          "p95": 417.17,
+          "p99": 676.99,
+          "count": 1291
+        }
+      },
+      "delivery": {
+        "observations_committed": 3196,
+        "received_by_every_listener": 3196,
+        "completeness": 1.0,
+        "p50_ms": 120.46,
+        "p95_ms": 394.21,
+        "p99_ms": 568.32,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 172.5,
+          "max_cpu_percent": 40.4
+        },
+        "pid47690": {
+          "max_rss_mb": 172.1,
+          "max_cpu_percent": 39.5
+        },
+        "pid48800": {
+          "max_rss_mb": 169.8,
+          "max_cpu_percent": 40.4
+        },
+        "pid48803": {
+          "max_rss_mb": 86.2,
+          "max_cpu_percent": 39.6
+        },
+        "max_db_connections": 25
+      }
+    },
+    {
+      "concurrent_users": 100,
+      "duration_s": 15.22,
+      "requests_ok": 3412,
+      "requests_failed": 1,
+      "errors_by_kind": {
+        "ReadError": 1
+      },
+      "throughput_rps": 224.2,
+      "error_rate": 0.0003,
+      "latency_ms": {
+        "predict": {
+          "p50": 306.85,
+          "p95": 1332.42,
+          "p99": 2482.6,
+          "count": 2401
+        },
+        "history": {
+          "p50": 295.74,
+          "p95": 1185.67,
+          "p99": 2046.13,
+          "count": 1011
+        }
+      },
+      "delivery": {
+        "observations_committed": 2401,
+        "received_by_every_listener": 2401,
+        "completeness": 1.0,
+        "p50_ms": 276.61,
+        "p95_ms": 1275.37,
+        "p99_ms": 2387.91,
+        "duplicate_deliveries": 0
+      },
+      "resources": {
+        "pid47687": {
+          "max_rss_mb": 173.4,
+          "max_cpu_percent": 33.6
+        },
+        "pid47690": {
+          "max_rss_mb": 85.1,
+          "max_cpu_percent": 34.1
+        },
+        "pid48800": {
+          "max_rss_mb": 173.1,
+          "max_cpu_percent": 32.2
+        },
+        "pid48803": {
+          "max_rss_mb": 172.8,
+          "max_cpu_percent": 33.7
+        },
+        "max_db_connections": 25
+      }
+    }
+  ]
+}

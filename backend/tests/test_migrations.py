@@ -89,7 +89,7 @@ def test_migration_upgrades_existing_v1_database_without_losing_records(tmp_path
 
     with get_engine().connect() as connection:
         ledger = connection.execute(select(MIGRATIONS.c.version, MIGRATIONS.c.name).order_by(MIGRATIONS.c.version)).all()
-    assert [row.version for row in ledger] == [1, 2, 3, 4]
+    assert [row.version for row in ledger] == list(range(1, LATEST_VERSION + 1))
     assert ledger[0].name is None and ledger[2].name == "backfill_alert_timestamps"
 
     observations = list_observations(patient_id="DEMO-LEGACY-1")

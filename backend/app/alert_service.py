@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import func, insert, select, update, desc
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
+from .event_broker import record_event
 from .storage import get_engine
 from .storage_schema import alerts, audit_events
 
@@ -36,9 +37,17 @@ def _audit(connection, entity_id: str, action: str, actor: str, details: dict) -
     ))
 
 
+def alert_created_event(alert: dict, observation_id: int | None = None, session_id: str | None = None) -> dict:
+    return {"type": "alert.created", "event_id": alert["id"], "observation_id": observation_id,
+            "session_id": session_id, "alert": alert, "demo_only": True}
+
+
 def insert_alert(connection: Connection, *, patient_id: str, event_key: str, severity: str,
-                 title: str, details: dict) -> dict:
-    """Insert an alert and its creation audit row inside the caller's transaction."""
+                 title: str, details: dict, emit_event: bool = True) -> dict:
+    """Insert an alert and its creation audit row inside the caller's transaction.
+
+    With emit_event, the alert.created outbox event is written in the same transaction.
+    """
     result = connection.execute(insert(alerts).values(
         patient_id=patient_id, event_key=event_key, severity=severity,
         status="open", title=title,
@@ -46,7 +55,11 @@ def insert_alert(connection: Connection, *, patient_id: str, event_key: str, sev
     ))
     row = connection.execute(select(alerts).where(alerts.c.id == result.inserted_primary_key[0])).mappings().one()
     _audit(connection, str(row["id"]), "created", "demo-system", {"severity": severity, "event_key": event_key})
-    return _serialize(row)
+    alert = _serialize(row)
+    if emit_event:
+        record_event(connection, "alert.created", alert_created_event(alert, details.get("observation_id")),
+                     aggregate_id=alert["id"])
+    return alert
 
 
 def create_alert(*, patient_id: str, event_key: str, severity: str, title: str, details: dict) -> dict | None:
@@ -118,8 +131,11 @@ def transition_alert(alert_id: int, action: str, actor: str) -> dict | None:
                 .values(status="resolved", resolved_at=func.now())).rowcount
             if changed:
                 _audit(connection, str(alert_id), "resolved", actor, {})
-        updated = connection.execute(select(alerts).where(alerts.c.id == alert_id)).mappings().one()
-        return _serialize(updated)
+        updated = _serialize(connection.execute(select(alerts).where(alerts.c.id == alert_id)).mappings().one())
+        if changed:
+            record_event(connection, "alert.updated", {"type": "alert.updated", "event_id": alert_id, "action": action,
+                         "actor": actor, "alert": updated, "demo_only": True}, aggregate_id=alert_id)
+        return updated
 
 
 def list_alert_audit(alert_id: int, limit: int = MAX_AUDIT_EVENTS) -> list[dict]:
