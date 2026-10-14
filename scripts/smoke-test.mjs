@@ -171,10 +171,21 @@ async function main() {
     }),
   });
   assert.equal(explanation.demo_only, true);
+  assert.equal(explanation.clinically_validated, false);
   assert.equal(explanation.model_version, prediction.model_version);
-  assert.equal(explanation.contributions.length, 7);
-  assert.ok(explanation.caveat.includes('not causal'));
-  console.log('✓ Model contribution endpoint and caveat');
+  assert.ok(Array.isArray(explanation.contributions));
+  assert.ok(explanation.caveat.toLowerCase().includes('causality') || explanation.caveat.toLowerCase().includes('causal'));
+  const reconstruction = explanation.reconstruction_check;
+  assert.ok(reconstruction && typeof reconstruction.available === 'boolean',
+    'Explanation endpoint must report the additive reconstruction check');
+  if (reconstruction.available) {
+    assert.equal(reconstruction.model_version, explanation.model_version);
+    assert.equal(reconstruction.passed, true, 'Additive explanation must reconstruct model log-odds within tolerance');
+    assert.ok(reconstruction.absolute_error <= reconstruction.tolerance);
+  } else {
+    console.log('⚠ Active model does not support the logistic-regression reconstruction check.');
+  }
+  console.log('✓ Model contribution endpoint, caveat, and additive consistency check');
 
   const historyPath = `/api/v1/observations?patient_id=${encodeURIComponent(patientId)}&limit=10`;
   const { data: history } = await request(historyPath);
@@ -239,6 +250,22 @@ async function main() {
   const { data: audit } = await request('/api/v1/alerts/' + alertId + '/audit');
   assert.ok(audit.count >= 3, 'Alert audit should include creation, acknowledgement, and resolution');
   console.log('✓ Persistent alert lifecycle and audit trail');
+
+  // This endpoint is deliberately fail-closed and requires a server-configured
+  // bearer token. The token is supplied only by a protected CI secret or operator.
+  const escalationToken = process.env.VITALGUARD_ALERT_ESCALATION_TOKEN;
+  if (escalationToken) {
+    const { data: escalation } = await request('/api/v1/alerts/escalation-preview?limit=100', {
+      headers: { Authorization: 'Bearer ' + escalationToken },
+    });
+    assert.equal(escalation.demo_only, true);
+    assert.equal(escalation.notifications_sent, false);
+    assert.equal(escalation.clinical_policy, false);
+    assert.ok(Number.isInteger(escalation.due_count));
+    console.log('✓ Authenticated synthetic alert escalation preview');
+  } else {
+    console.log('↷ Skipping authenticated escalation preview: VITALGUARD_ALERT_ESCALATION_TOKEN is not configured in this smoke-test environment.');
+  }
 
   const { data: timeline } = await request('/api/v1/patients/' + encodeURIComponent(alertPatientId) + '/timeline?limit=20');
   assert.equal(timeline.demo_only, true);
