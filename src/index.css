@@ -70,3 +70,22 @@ h1, h2, .font-display { font-family: "Plus Jakarta Sans", Inter, system-ui, sans
 @media (prefers-reduced-motion: reduce) { .page-enter, .toast-enter, .pulse-dot, .stagger > *, .vg-bar-grow, .animate-vg-ecg, .animate-vg-drift, .skel::after { animation: none !important; } }
 
 
+
+/* Installed app (standalone) on notched phones: keep content clear of the status bar and home indicator. */
+@supports (padding: env(safe-area-inset-top)) {
+  body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  @media (display-mode: standalone) {
+    body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  }
+}
+/* Touch screens: at least 44x44 px hit targets, no 300 ms tap delay, no accidental text selection on controls. */
+@media (pointer: coarse) {
+  .btn, .icon-btn, .tab-btn, .vg-navlink, select { min-height: 44px; }
+  .icon-btn { min-width: 44px; display: inline-grid; place-items: center; }
+  .touch-target { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  button, a, select { touch-action: manipulation; }
+}
+@media (display-mode: standalone) {
+  /* No browser chrome: avoid pull-to-refresh accidentally reloading the dashboard. */
+  html, body { overscroll-behavior-y: none; }
+}

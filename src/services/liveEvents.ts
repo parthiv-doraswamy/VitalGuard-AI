@@ -81,6 +81,8 @@ interface SocketOptions {
   onOpen?: (info: { reconnect: boolean }) => void;
   onClockSample?: (sample: ClockSample) => void;
   heartbeatMs?: number;
+  /** Close a connection that has not answered a ping within this time (half-open sockets). */
+  pongTimeoutMs?: number;
 }
 
 export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: (status: LiveStatus) => void, options: SocketOptions = {}) {
@@ -90,10 +92,17 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
   let opened = false;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let pongWatchdog: ReturnType<typeof setTimeout> | undefined;
 
   const sendPing = () => {
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping', client_time: Date.now() }));
+    if (socket?.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: 'ping', client_time: Date.now() }));
+    if (!pongWatchdog) {
+      // A network drop can leave a socket that never errors; without a pong it is not "connected".
+      pongWatchdog = setTimeout(() => { pongWatchdog = undefined; socket?.close(); }, options.pongTimeoutMs ?? 10000);
+    }
   };
+  const clearWatchdog = () => { if (pongWatchdog) clearTimeout(pongWatchdog); pongWatchdog = undefined; };
 
   const connect = () => {
     if (stopped) return;
@@ -124,6 +133,7 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
         return;
       }
       if (event.type === 'pong') {
+        clearWatchdog();
         const sample = clockSampleFromPong(event, receivedAt);
         if (sample) options.onClockSample?.(sample);
       }
@@ -133,23 +143,53 @@ export function createLiveSocket(onEvent: (event: LiveEvent) => void, onStatus: 
     socket.onclose = () => {
       if (heartbeat) clearInterval(heartbeat);
       heartbeat = undefined;
+      clearWatchdog();
       if (!stopped) scheduleRetry();
     };
   };
 
+  const browserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
   const scheduleRetry = () => {
     if (stopped) return;
+    if (browserOffline()) {
+      // No point retrying until the browser reports a network again (see onOnline).
+      onStatus('offline');
+      return;
+    }
     retry += 1;
     onStatus(retry > 5 ? 'offline' : 'reconnecting');
     const delay = Math.min(30000, 1000 * 2 ** Math.min(retry - 1, 5));
     retryTimer = setTimeout(connect, delay);
   };
 
+  const onOffline = () => {
+    onStatus('offline');
+    if (retryTimer) clearTimeout(retryTimer);
+    socket?.close();
+  };
+  const onOnline = () => {
+    if (stopped) return;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (socket && socket.readyState === WebSocket.OPEN) return;
+    retry = 1; // reconnect now; catch-up runs on open
+    connect();
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+  }
+
   connect();
   return () => {
     stopped = true;
     if (retryTimer) clearTimeout(retryTimer);
     if (heartbeat) clearInterval(heartbeat);
+    clearWatchdog();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    }
     socket?.close();
   };
 }

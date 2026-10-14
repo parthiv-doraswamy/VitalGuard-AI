@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
+import { useOnlineStatus } from '../../services/pwa.ts';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
 
 type BackendAlert = {
@@ -31,6 +32,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function BackendAlertInbox() {
   const { alertsReceived, status } = useLiveEvents();
+  const online = useOnlineStatus();
   const [items, setItems] = useState<BackendAlert[]>([]);
   const [filter, setFilter] = useState<'all' | BackendAlert['status']>('all');
   const [loading, setLoading] = useState(true);
@@ -138,8 +140,8 @@ export function BackendAlertInbox() {
                 <button className="btn-secondary !text-xs" aria-expanded={expandedId === alert.id} onClick={() => void showAudit(alert.id)}>
                   <History size={13} /> Audit trail <ChevronDown size={13} className={expandedId === alert.id ? 'rotate-180' : ''} />
                 </button>
-                {alert.status === 'open' && <button className="btn-secondary !text-xs" disabled={busyId === alert.id} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
-                {alert.status !== 'resolved' && <button className="btn-primary !text-xs" disabled={busyId === alert.id} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
+                {alert.status === 'open' && <button className="btn-secondary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
+                {alert.status !== 'resolved' && <button className="btn-primary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
               </div>
               {expandedId === alert.id && <div className="w-full basis-full rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3">
                 <p className="text-xs font-bold flex items-center gap-1.5"><History size={13} /> Alert audit timeline</p>

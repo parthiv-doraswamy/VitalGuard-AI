@@ -7,6 +7,7 @@ import { LiveStatusPanel } from '../components/live/LiveStatusPanel.tsx';
 import { LiveEventLog } from '../components/live/LiveEventLog.tsx';
 import { liveDemoApi, type LiveDemoConfig, type StreamScenario } from '../services/api.ts';
 import { useLiveEvents } from '../services/useLiveEvents.ts';
+import { useOnlineStatus } from '../services/pwa.ts';
 import type { StreamProducer } from '../services/streamProducer.ts';
 
 const SCENARIOS: { value: StreamScenario; label: string }[] = [
@@ -18,6 +19,7 @@ const INTERVALS = [1000, 2000, 3000, 5000];
 
 function ProducerControls({ producer }: { producer: StreamProducer }) {
   const { state } = producer;
+  const online = useOnlineStatus();
   const [scenario, setScenario] = useState<StreamScenario>('worsening');
   const [intervalMs, setIntervalMs] = useState(2000);
   const [producerKey, setProducerKey] = useState('');
@@ -59,7 +61,7 @@ function ProducerControls({ producer }: { producer: StreamProducer }) {
           </label>
         )}
         <div className="flex flex-wrap gap-2">
-          {!active && <button type="button" className="btn-primary !py-1.5" disabled={busy} onClick={() => { void begin(); }}><Play size={15} aria-hidden /> Start stream</button>}
+          {!active && <button type="button" className="btn-primary !py-1.5" disabled={busy || !online} onClick={() => { void begin(); }}><Play size={15} aria-hidden /> Start stream</button>}
           {state.phase === 'running' && <button type="button" className="btn-secondary !py-1.5" onClick={() => { void producer.pause(); }}><Pause size={15} aria-hidden /> Pause</button>}
           {state.phase === 'paused' && <button type="button" className="btn-primary !py-1.5" onClick={() => { void producer.resume(); }}><Play size={15} aria-hidden /> Resume</button>}
           {active && <button type="button" className="btn-secondary !py-1.5" onClick={() => { void producer.stop(); }}><Square size={14} aria-hidden /> Stop stream</button>}

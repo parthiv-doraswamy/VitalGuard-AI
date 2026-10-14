@@ -24,6 +24,12 @@
 
 The live smoke workflow is intentionally manual for release verification so it does not race the separately deployed backend whenever frontend files change.
 
+## Progressive Web App releases
+
+- `npm run build` emits `dist/sw.js`, `dist/workbox-*.js` and `dist/manifest.webmanifest`. CI runs `npm run verify:pwa`.
+- After a frontend deploy, confirm `https://vitalguard-ai-g215.onrender.com/sw.js` returns JavaScript (not `index.html`), then follow the manual checklist in [PWA.md](PWA.md).
+- Users on an older version see an update prompt. Render's 5-minute CDN cache can delay it. Never add a second service worker or change the worker's file name without a migration plan.
+
 ## Current limitations
 
 - Hosted PostgreSQL is not confirmed configured. SQLite remains the backend default unless `DATABASE_URL` is set. A local SQLite file on a hosted ephemeral filesystem is not durable across all redeploy/restart scenarios.

@@ -187,3 +187,43 @@ describe('live events provider', () => {
     vi.useRealTimers();
   });
 });
+
+describe('connection honesty', () => {
+  beforeEach(() => {
+    FakeSocket.instances = [];
+    vi.stubGlobal('WebSocket', FakeSocket);
+  });
+
+  it('drops a socket that stops answering pings instead of claiming to be connected', async () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const { createLiveSocket } = await import('../services/liveEvents.ts');
+    const stop = createLiveSocket(() => undefined, (status) => statuses.push(status), { heartbeatMs: 1000, pongTimeoutMs: 3000 });
+    FakeSocket.instances[0].open();
+    expect(statuses[statuses.length - 1]).toBe('connected');
+    vi.advanceTimersByTime(3100);  // ping sent on open, no pong
+    expect(statuses[statuses.length - 1]).toBe('reconnecting');
+    stop();
+    vi.useRealTimers();
+  });
+
+  it('reports offline immediately and reconnects as soon as the browser is back online', async () => {
+    vi.useFakeTimers();
+    const statuses: string[] = [];
+    const { createLiveSocket } = await import('../services/liveEvents.ts');
+    const stop = createLiveSocket(() => undefined, (status) => statuses.push(status));
+    FakeSocket.instances[0].open();
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    window.dispatchEvent(new Event('offline'));
+    expect(statuses[statuses.length - 1]).toBe('offline');
+    vi.advanceTimersByTime(60000);
+    expect(FakeSocket.instances).toHaveLength(1);  // no futile retries while offline
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+    window.dispatchEvent(new Event('online'));
+    expect(FakeSocket.instances).toHaveLength(2);
+    FakeSocket.instances[1].open();
+    expect(statuses[statuses.length - 1]).toBe('connected');
+    stop();
+    vi.useRealTimers();
+  });
+});

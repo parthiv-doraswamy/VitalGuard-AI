@@ -184,3 +184,10 @@ Never use real patient data. Missing or stale observations are unknown, not norm
   - Frontend: lint, 40 unit tests and build.
   - Live API smoke script: all checks pass against this branch.
   - Playwright: 5/5.
+
+### Phase 49 — Installable Progressive Web App (`feature/pwa`; not yet deployed)
+- One manifest, maskable and standard icons, and one Workbox service worker (`vite-plugin-pwa` 1.3.0, pinned) that precaches the app shell and static assets. Only Google Fonts are cached at runtime; **API responses are never cached**.
+- Prompt-based update flow: a new version waits for **Update now**. Honest offline and stale-data banners; backend actions are disabled offline. The live socket now detects half-open connections (pong watchdog) and browser offline/online.
+- 44 px touch targets, safe-area insets, standalone tweaks.
+- **Verified locally in headless Chromium:** installability check with no errors, a single worker, offline shell, no API data in caches, and the update flow with two real builds. 52 unit tests; Playwright 9/9.
+- **Not verified:** real installation on desktop/Android/iOS devices, and the deployed update flow. See [PWA.md](PWA.md).

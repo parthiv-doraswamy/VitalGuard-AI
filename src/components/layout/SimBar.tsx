@@ -43,7 +43,7 @@ export function SimBar() {
           <div className="inline-flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50" role="group" aria-label="Speed multiplier">
             {([1, 2] as const).map((m) => (
               <button key={m} onClick={() => setMultiplier(m)} aria-pressed={multiplier === m}
-                className={`px-3 py-1.5 text-[13px] font-bold tabular-nums transition-all ${multiplier === m ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-white'}`}>
+                className={`touch-target px-3 py-1.5 text-[13px] font-bold tabular-nums transition-all ${multiplier === m ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-white'}`}>
                 {m}×
               </button>
             ))}

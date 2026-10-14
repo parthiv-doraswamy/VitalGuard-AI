@@ -14,7 +14,7 @@ export function PageHeader({ eyebrow, title, subtitle, actions, crumbs }: {
             {crumbs.map((c, i) => (
               <span key={c.label} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight size={12} aria-hidden />}
-                {c.to ? <Link to={c.to} className="hover:text-teal-700 hover:underline font-medium">{c.label}</Link> : <span aria-current="page" className="text-slate-500">{c.label}</span>}
+                {c.to ? <Link to={c.to} className="touch-target hover:text-teal-700 hover:underline font-medium">{c.label}</Link> : <span aria-current="page" className="text-slate-500">{c.label}</span>}
               </span>
             ))}
           </nav>

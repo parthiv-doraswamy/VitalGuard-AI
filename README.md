@@ -102,6 +102,10 @@ History can be inspected at:
 
 This is a one-observation-per-request simulator, not a continuous device feed. Each request creates a new observation; requests are not idempotent. The backend broadcasts saved observations and alerts over `/api/v1/live`, and the dashboard includes backend alert, history, timeline and trend views. Not all patient cards/charts are API-backed. Durable hosted PostgreSQL configuration remains outstanding.
 
+## Progressive Web App
+
+The production build is an installable PWA. It precaches the app shell and static assets and never caches API data. It shows offline and stale-data warnings, and asks before updating. Installation and offline behaviour vary by browser and OS; see [docs/PWA.md](docs/PWA.md) for what has and has not been verified.
+
 ## Important limitations
 
 - Patient directory, vital charts, cohort analytics and some local alert cards still use local synthetic fixtures; backend history and alert operations are separate views.

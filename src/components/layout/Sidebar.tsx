@@ -103,7 +103,7 @@ export function MobileNav() {
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute left-0 top-0 bottom-0 w-72 shadow-2xl flex flex-col text-slate-200" style={{ background: 'linear-gradient(180deg,#0a1128,#0d1630)' }}>
             <div className="flex items-center justify-between pr-2"><div className="flex-1"><Brand /></div>
-              <button className="p-2 rounded-xl text-slate-400 hover:bg-white/10" aria-label="Close navigation menu" onClick={() => setOpen(false)}><X size={20} /></button>
+              <button className="touch-target p-2 rounded-xl text-slate-400 hover:bg-white/10" aria-label="Close navigation menu" onClick={() => setOpen(false)}><X size={20} /></button>
             </div>
             <div className="flex-1 overflow-y-auto"><NavItems onNavigate={() => setOpen(false)} /></div>
             <SideFoot />
