@@ -30,7 +30,8 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function BackendAlertInbox() {
+/** `highlightId` comes from a notification click (/#/alerts?alert=ID). */
+export function BackendAlertInbox({ highlightId = null }: { highlightId?: number | null } = {}) {
   const { alertsReceived, status } = useLiveEvents();
   const online = useOnlineStatus();
   const [items, setItems] = useState<BackendAlert[]>([]);
@@ -127,7 +128,9 @@ export function BackendAlertInbox() {
         filtered.length === 0 ? <p className="text-sm text-slate-500 mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-4">No backend alerts in this filter. Submit a synthetic prediction with an elevated score to create a demo alert.</p> :
         <div className="mt-3 space-y-2">
           {filtered.map((alert) => (
-            <article key={alert.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <article key={alert.id} id={`backend-alert-${alert.id}`} data-highlighted={alert.id === highlightId || undefined}
+              ref={alert.id === highlightId ? (node) => node?.scrollIntoView({ block: 'center' }) : undefined}
+              className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center gap-3 ${alert.id === highlightId ? 'border-teal-500 ring-2 ring-teal-200' : 'border-slate-200 dark:border-slate-700'}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">#{alert.id} · {alert.severity}</span>

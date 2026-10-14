@@ -191,3 +191,8 @@ Never use real patient data. Missing or stale observations are unknown, not norm
 - 44 px touch targets, safe-area insets, standalone tweaks.
 - **Verified locally in headless Chromium:** installability check with no errors, a single worker, offline shell, no API data in caches, and the update flow with two real builds. 52 unit tests; Playwright 9/9.
 - **Not verified:** real installation on desktop/Android/iOS devices, and the deployed update flow. See [PWA.md](PWA.md).
+
+### Phase 50 — Web Push notifications (`feature/web-push` backend, `feature/web-push-ui` frontend; not yet deployed)
+- Explicit opt-in in Settings, device-scoped subscriptions (management token; no user accounts exist), severity preference, test send, and an honest delivery list (accepted by the push service vs shown/opened on the device).
+- Push and click handlers are imported into the single PWA service worker. Payloads contain no patient data; clicks open `/#/alerts?alert=ID`, which highlights the alert. The in-app alert center remains the fallback.
+- **Tested:** real Chrome 155 on macOS 26.5.2 through FCM, foreground and background (no window), with device display receipts. **Not tested:** Android, iOS/iPadOS, Edge, Firefox, Safari, OS-level notification clicks, and a fully quit browser. Details are in `docs/WEB_PUSH.md` on the backend branch.

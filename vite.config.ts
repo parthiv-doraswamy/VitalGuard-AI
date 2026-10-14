@@ -18,6 +18,9 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // Push and notification-click handlers live in public/push-sw.js and are loaded
+        // into this same worker; there is still exactly one service worker.
+        importScripts: ['push-sw.js'],
         // Explicit allowlist: only public font files are cached at runtime. API calls
         // (patient histories, predictions, alerts, live events) are never cached and
         // go straight to the network, so offline they fail visibly instead of showing old data.

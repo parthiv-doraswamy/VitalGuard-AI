@@ -39,6 +39,11 @@ function subscribe(listener: () => void) {
 export function initPwa(): boolean {
   if (initialized || typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
   initialized = true;
+  // Notification clicks route an already-open window in place (see public/push-sw.js).
+  navigator.serviceWorker.addEventListener?.('message', (event: MessageEvent) => {
+    const url = event.data?.type === 'vg-navigate' ? event.data.url : null;
+    if (typeof url === 'string' && /^\/#\/[A-Za-z0-9/?=&_-]*$/.test(url)) window.location.hash = url.slice(2);
+  });
   updateServiceWorker = registerSW({
     immediate: true,
     onNeedRefresh: () => setState({ needRefresh: true }),

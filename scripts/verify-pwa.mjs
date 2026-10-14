@@ -42,6 +42,8 @@ check(!precached.some((url) => /api|\.json$/i.test(url)), 'API-like URLs must no
 const routes = [...sw.matchAll(/registerRoute\((\/[^,]+\/),/g)].map((match) => match[1]);
 check(routes.every((route) => route.includes('fonts')), `only font runtime routes are allowed, found ${routes.join(' ')}`);
 check(sw.includes('denylist:[/^\\/api\\//]'), 'navigation fallback must exclude /api/');
+check(sw.includes('importScripts("push-sw.js")'), 'push handlers must be imported into the single worker');
+check(existsSync(join(dist, 'push-sw.js')), 'dist/push-sw.js missing');
 
 const registrations = readdirSync(join(dist, 'assets')).filter((name) => name.endsWith('.js'))
   .map((name) => (readFileSync(join(dist, 'assets', name), 'utf8').match(/serviceWorker\.register\(/g) || []).length)
