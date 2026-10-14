@@ -148,6 +148,17 @@ Never use real patient data. Missing or stale observations are unknown, not norm
 - This is not a durability claim. The same synthetic record must still be queried after a controlled restart/redeploy before persistence readiness can be marked complete.
 - External SQL inspection remains blocked by the database network policy; keep the database private rather than adding a broad allowlist.
 
+
+### Phase 46 — Persistence hardening (backend feature branch; hosted verification still pending)
+- Hosted startup can require PostgreSQL with `VITALGUARD_REQUIRE_POSTGRES=true`; the managed database must be configured before enabling the guard.
+- Pooled database connections use explicit connection, statement and idle-transaction timeouts.
+- Observation, alert and alert-audit writes are transactional; WebSocket events are emitted only after commit. Database failures should not return a fake success.
+- Versioned migrations add history indexes and backfill alert timestamps, with an upgrade path for existing v1 databases.
+- Race-safe alert transitions, cursor-paginated alerts, bounded audit/timeline queries, and health diagnostics for backend/durability/schema version.
+- Backup/restore utilities and a process-restart persistence check are included.
+- Local verification was reported for SQLite and disposable PostgreSQL; this is not evidence of hosted restart durability.
+- **Still open:** verify PostgreSQL on the hosted service, enable the Postgres requirement only after confirming its connection string, run a restart-survival check across a hosted restart/redeploy, and complete a backup/restore drill into a separate non-production database. Keep the database private.
+
 ### Phase 47 — Synchronized two-laptop streaming (branches `feature/live-demo-backend` + `feature/live-demo-frontend`, not yet deployed)
 - **Laptop A** opens **Live demo** (`/#/live-demo`, Producer), chooses a stable, worsening or recovering scenario and an interval, then explicitly starts the stream. **Laptop B** opens the normal **Dashboard**. Its "Synchronized backend stream" panel updates automatically, with no controls and nothing started on B.
 - The backend owns the stream session. A receives a producer token once (kept in this tab's sessionStorage); pause, resume, stop and emit require it. Only one producer can be active: a second start gets a 409 and must explicitly choose **Take over and start**. An optional `VITALGUARD_STREAM_PRODUCER_KEY` gates who may start a stream.
