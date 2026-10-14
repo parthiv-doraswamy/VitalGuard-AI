@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 from .live_events import hub
 from .model import MODEL_VERSION, explain, predict_probability, risk_level
+from .alert_service import create_alert
 from .schemas import RiskPrediction
 from .simulator import observation_for_step
 from .storage import save_observation
@@ -30,4 +31,19 @@ async def submit_demo_observation(payload: SimulationRequest):
     await hub.broadcast({"type": "observation.created", "event_id": saved["id"],
         "patient_id": payload.patient_id, "created_at": saved["created_at"],
         "observation": values, "prediction": response.model_dump(), "demo_only": True})
+
+    # Keep simulator-driven demos consistent with direct risk predictions:
+    # elevated synthetic scores create a persisted, auditable alert.
+    if score >= 65:
+        alert = create_alert(
+            patient_id=payload.patient_id,
+            event_key=f"observation:{saved['id']}:elevated-risk",
+            severity="critical" if response.risk_level == "critical" else "high",
+            title=f"{response.risk_level.title()} demo risk score",
+            details={"observation_id": saved["id"], "risk_score": score,
+                     "risk_level": response.risk_level, "vitals": values, "demo_only": True},
+        )
+        if alert:
+            await hub.broadcast({"type": "alert.created", "event_id": alert["id"],
+                                 "alert": alert, "demo_only": True})
     return response
