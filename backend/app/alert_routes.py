@@ -1,6 +1,6 @@
 """HTTP endpoints for synthetic demo alert lifecycle."""
 from typing import Literal
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from .event_broker import events
