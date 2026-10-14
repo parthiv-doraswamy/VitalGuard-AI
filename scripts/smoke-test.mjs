@@ -55,7 +55,19 @@ async function main() {
   }
   console.log('✓ Health endpoint and storage-backend diagnostics');
 
-  const { data: model } = await request('/api/v1/model/info');
+  const { response: modelResponse, data: model } = await request('/api/v1/model/info');
+  const expectedSecurityHeaders = {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'no-referrer',
+    'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+    'cache-control': 'no-store',
+  };
+  for (const [header, expected] of Object.entries(expectedSecurityHeaders)) {
+    assert.equal(modelResponse.headers.get(header), expected, 'Missing or incorrect security header: ' + header);
+  }
+  assert.ok(modelResponse.headers.get('x-request-id'), 'Each API response should include a request ID');
+  console.log('✓ Baseline API security headers and request ID');
   assert.equal(model.demo_only, true);
   assert.equal(model.clinically_validated, false);
   assert.ok(Array.isArray(model.features) && model.features.length >= 7);
