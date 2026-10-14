@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
 from .model import active_model, predict_probability
 from .model_evaluation import coefficient_contributions, evaluation_report
+from .explanation_validation import validate_additive_explanation
 from .news2 import score_news2
 from .schemas import ModelInfo, NEWS2Input, RiskPrediction, VitalInput
 from .simulator_routes import live_router, router as simulator_router
@@ -191,14 +192,16 @@ async def predict(payload: VitalInput):
 @app.post("/api/v1/risk/explain")
 def explain_risk(payload: VitalInput):
     values = payload.model_dump(exclude={"patient_id"})
+    reconstruction_check = validate_additive_explanation(values)
     return {"patient_id": payload.patient_id, "model_version": active_model().version,
         "risk_score": round(predict_probability(values) * 100),
         "contributions": coefficient_contributions(values),
         "method": ("standardized logistic-regression coefficient contributions"
                    if active_model().supports_coefficient_contributions
                    else f"not available for {active_model().algorithm}"),
-        "caveat": "These are model contributions, not causal explanations or clinical guidance.",
-        "demo_only": True}
+        "reconstruction_check": reconstruction_check,
+        "caveat": "Mathematical consistency does not establish causality, calibration, clinical validity, or clinical guidance.",
+        "demo_only": True, "clinically_validated": False}
 
 @app.get("/api/v1/observations")
 def observation_history(patient_id: str | None = Query(default=None, min_length=1, max_length=64),
