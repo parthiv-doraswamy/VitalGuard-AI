@@ -39,6 +39,13 @@ The live smoke workflow is intentionally manual for release verification so it d
 - After a frontend deploy, confirm `https://vitalguard-ai-g215.onrender.com/sw.js` returns JavaScript (not `index.html`), then follow the manual checklist in [PWA.md](PWA.md).
 - Users on an older version see an update prompt. Render's 5-minute CDN cache can delay it. Never add a second service worker or change the worker's file name without a migration plan.
 
+## WebSocket resilience and dashboard review preview
+
+- `VITALGUARD_WEBSOCKET_SEND_TIMEOUT_SECONDS` must be a finite positive number (default 2 seconds). Invalid values fail fast during backend initialization.
+- Slow/disconnected WebSocket clients are dropped from the local hub; clients must recover missed records from REST history/replay.
+- The Phase 13 dashboard preview calls the Phase 11 protected endpoint only when a non-expired bearer token is present in the operator session. The current demo persona login is not backend authentication and does not issue such a token.
+- Never put `VITALGUARD_ALERT_ESCALATION_TOKEN` in frontend source or a public `VITE_*` variable. Until a real authenticated session can supply a token accepted by the backend, the inbox remains usable and the preview shows an unavailable state.
+
 ## Alert escalation preview
 
 - The synthetic preview endpoint is `GET /api/v1/alerts/escalation-preview`.
