@@ -88,6 +88,32 @@
 - Smoke tests cover the trend endpoint and insufficient-history state.
 - Patient detail combines timeline and trend panels.
 
+### Phase 28–31 — Integration hardening
+- Continued integration and release checks across the dashboard, backend-backed history and alert workflows.
+- Changes are covered by the repository's current frontend/backend CI and live API smoke workflow; consult the linked workflow runs for the exact commit tested.
+
+### Phase 32 — Patient navigation regression
+- Patient-detail Back navigation remains usable when decorative overlays are present; overlay hit-testing no longer blocks the link.
+
+### Phase 33 — Protected-route browser coverage
+- Browser end-to-end coverage authenticates the demo Admin before asserting protected-route behavior.
+
+### Phase 34 — Browser test reliability
+- Removed TypeScript-only syntax from the JavaScript Playwright test so the E2E runner can parse the test file reliably.
+
+### Phase 35–40 — API release and CORS regression coverage
+- Backend CORS preflight permits the frontend origin and the `Accept`, `Authorization`, and `Content-Type` headers.
+- Live API smoke explicitly sends an authorization/content-type preflight and asserts both headers are allowed.
+- Latest verified main commit for this coverage: `e1a0a2b18fbc2f418fa4b25631c331cc389d7e6a`.
+- Latest verified CI run: [Validate VitalGuard AI](https://github.com/parthiv-doraswamy/VitalGuard-AI/actions/runs/38550484939) — success.
+- Latest verified live API smoke: [Live API smoke test](https://github.com/parthiv-doraswamy/VitalGuard-AI/actions/runs/38550484982) — success. This confirms the tested live API behavior at the time of that run, not PostgreSQL durability.
+
+### Phase 41 — Hosted persistence readiness (open)
+- Verify the backend Render service uses the private PostgreSQL connection string through its `DATABASE_URL` environment variable.
+- Run a synthetic observation workflow, confirm the record is available from history/timeline, then verify it survives a backend restart or redeploy.
+- Do not claim hosted persistence complete until the database target and survival test are both verified.
+- The Render PostgreSQL instance is not yet confirmed connected. Do not broaden database network access to `0.0.0.0/0` to work around restricted external access.
+
 ## Remaining work before any real-world use
 
 1. Provision a managed PostgreSQL database, configure secrets in Render, and verify data survival across restart/redeploy. Define retention, backup, restore, and migration procedures.
