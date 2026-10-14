@@ -21,6 +21,13 @@
 4. Run GitHub Actions → **Live API smoke test** → Run workflow. Do not interpret an earlier smoke failure as a code regression until confirming whether the required backend commit was deployed.
 5. Open the frontend, check the live channel, alert inbox, data quality, history and Settings model panels.
 6. Inspect Render logs if the deploy fails; do not report deployment complete based only on a GitHub merge.
+7. After a backend deploy that touches storage, confirm `/health` → `database.backend = postgresql`, `durable_backend = true`, and `schema_version = latest_schema_version`. Then run `python backend/scripts/persistence_check.py write`, restart the backend service, and run `verify` with the same state file.
+
+## Persistence settings (backend service, private environment)
+
+- `DATABASE_URL`: the managed PostgreSQL **internal** connection string. Never commit it or put it in a `VITE_` variable.
+- `VITALGUARD_REQUIRE_POSTGRES=true`: makes the service fail to start rather than fall back to ephemeral SQLite. Set it only after confirming `DATABASE_URL` is correct, because a wrong value will block the deploy.
+- Backup/restore drills target a separate, empty, non-production database. Do not open the database to `0.0.0.0/0`.
 
 The live smoke workflow is intentionally manual for release verification so it does not race the separately deployed backend whenever frontend files change.
 

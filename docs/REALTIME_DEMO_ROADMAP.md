@@ -147,3 +147,14 @@ Never use real patient data. Missing or stale observations are unknown, not norm
 - Updated the roadmap to reflect the latest successful live API smoke: PostgreSQL is reported as the active backend.
 - This is not a durability claim. The same synthetic record must still be queried after a controlled restart/redeploy before persistence readiness can be marked complete.
 - External SQL inspection remains blocked by the database network policy; keep the database private rather than adding a broad allowlist.
+
+### Phase 46 — Persistence hardening (backend branch `feature/persistence-hardening`, not yet deployed)
+- Hosted startup refuses non-PostgreSQL storage when `VITALGUARD_REQUIRE_POSTGRES=true`, and fails on unreachable or unsupported databases.
+- One pooled engine per process with connect, statement and idle-transaction timeouts.
+- Observation, alert and alert-audit rows are written in one transaction; WebSocket events are published only after commit. Database failures return HTTP 503 (`database_unavailable`) and never a fake success.
+- Versioned, repeatable migrations: v2 history indexes and v3 alert-timestamp backfill, with an advisory lock, an upgrade path for existing v1 databases and a repair step. They are backward compatible with the currently deployed release.
+- Race-safe alert transitions that record `acknowledged_at`/`resolved_at`; cursor-paginated alerts; bounded audit and timeline queries.
+- `/health` reports backend, durability and schema version, without any URL or credentials.
+- Backup/restore drill (`python -m app.db_tools export|restore|verify`) and restart-survival check (`backend/scripts/persistence_check.py`).
+- **Verified locally only** (SQLite and a disposable PostgreSQL 17): 114 backend tests passing; real process restart survival; upgrade of a database written by the deployed release; native `pg_dump`/`pg_restore` and logical restore both verified by checksum.
+- **Still open (Phase 41 gate):** deploy to a preview backend, set `VITALGUARD_REQUIRE_POSTGRES=true`, run the restart check across a hosted restart/redeploy, and run a backup/restore drill into a separate empty non-production database. Details are in `docs/PERSISTENCE.md` on the backend branch.
