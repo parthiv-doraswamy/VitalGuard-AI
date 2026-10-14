@@ -22,7 +22,22 @@
 5. Open the frontend, check the live channel, alert inbox, data quality, history and Settings model panels.
 6. Inspect Render logs if the deploy fails; do not report deployment complete based only on a GitHub merge.
 
+
+7. After a backend deploy that touches storage, confirm `/health` reports PostgreSQL, durable storage and the latest schema version. Run the persistence check, restart the backend, and verify the same state file survives.
+
+## Persistence settings (backend service, private environment)
+
+- `DATABASE_URL`: use the managed PostgreSQL internal connection string. Never commit it or place it in a `VITE_` variable.
+- `VITALGUARD_REQUIRE_POSTGRES=true`: enable only after confirming the database URL is correct; otherwise the service may fail to start.
+- Run backup/restore drills against a separate, empty, non-production database. Do not widen the database network allowlist to the public internet.
+
 The live smoke workflow is intentionally manual for release verification so it does not race the separately deployed backend whenever frontend files change.
+
+## Progressive Web App releases
+
+- `npm run build` emits `dist/sw.js`, `dist/workbox-*.js` and `dist/manifest.webmanifest`. CI runs `npm run verify:pwa`.
+- After a frontend deploy, confirm `https://vitalguard-ai-g215.onrender.com/sw.js` returns JavaScript (not `index.html`), then follow the manual checklist in [PWA.md](PWA.md).
+- Users on an older version see an update prompt. Render's 5-minute CDN cache can delay it. Never add a second service worker or change the worker's file name without a migration plan.
 
 ## Current limitations
 

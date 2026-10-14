@@ -6,9 +6,10 @@ import { Header } from './Header.tsx';
 import { SimBar } from './SimBar.tsx';
 import { Toasts } from './Toasts.tsx';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
+import { ConnectionBanner, UpdatePrompt } from './PwaStatus.tsx';
 
 export function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
-  const { status, eventCount } = useLiveEvents();
+  const { status, eventCount, latest } = useLiveEvents();
   const navigate = useNavigate();
   const live = status === 'connected';
   function leaveDemo() {
@@ -31,8 +32,11 @@ export function Shell({ title, subtitle, children }: { title: string; subtitle?:
             <strong>Backend live channel: {status}</strong>
             <span className="opacity-80">· {eventCount} live events received in this view</span>
             <span className="ml-auto text-[10px] uppercase tracking-wider font-bold">Synthetic demo only</span>
-            <button type="button" onClick={leaveDemo} className="inline-flex items-center gap-1.5 rounded-lg border border-current/20 px-2.5 py-1.5 font-semibold transition hover:bg-black/5" aria-label="Sign out of demo"><LogOut size={13} /> Exit demo</button>
+            <button type="button" onClick={leaveDemo} className="touch-target inline-flex items-center gap-1.5 rounded-lg border border-current/20 px-2.5 py-1.5 font-semibold transition hover:bg-black/5" aria-label="Sign out of demo"><LogOut size={13} /> Exit demo</button>
           </div>
+        </div>
+        <div className="px-4 md:px-8 pt-2 max-w-[1440px] w-full mx-auto">
+          <ConnectionBanner liveStatus={status} lastLiveEventAt={latest?.receivedAt ?? null} />
         </div>
         <main id="main-content" className="page-enter flex-1 px-4 md:px-8 py-6 max-w-[1440px] w-full mx-auto" tabIndex={-1}>
           {children}
@@ -44,6 +48,7 @@ export function Shell({ title, subtitle, children }: { title: string; subtitle?:
         </footer>
       </div>
       <Toasts />
+      <UpdatePrompt />
     </div>
   );
 }

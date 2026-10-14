@@ -72,6 +72,7 @@ Copy `.env.example` to `.env` for local development. Vite variables prefixed wit
 - Source-documented NEWS2 parameter scoring demo endpoint (`POST /api/v1/scores/news2`) and Settings calculator; this is not a clinically validated or approved implementation.
 - Unified persisted patient timeline (`GET /api/v1/patients/{patient_id}/timeline`) and descriptive trend endpoint (`GET /api/v1/observations/trends?patient_id=...`).
 - Deterministic simulator endpoint for stable, worsening, and recovering fictional observation scenarios.
+- Synchronized two-laptop streaming demo (`/#/live-demo`): one producer starts a backend stream session; every signed-in dashboard receives the same committed, backend-scored fictional events, and catches up missed events after reconnecting. See the roadmap, Phase 47.
 
 ### Phase 1 API: synthetic observation ingestion
 
@@ -100,6 +101,10 @@ History can be inspected at:
 `GET /api/v1/observations?patient_id=DEMO-LIVE-001`
 
 This is a one-observation-per-request simulator, not a continuous device feed. Each request creates a new observation; requests are not idempotent. The backend broadcasts saved observations and alerts over `/api/v1/live`, and the dashboard includes backend alert, history, timeline and trend views. Not all patient cards/charts are API-backed. Durable hosted PostgreSQL configuration remains outstanding.
+
+## Progressive Web App
+
+The production build is an installable PWA. It precaches the app shell and static assets and never caches API data. It shows offline and stale-data warnings, and asks before updating. Installation and offline behaviour vary by browser and OS; see [docs/PWA.md](docs/PWA.md) for what has and has not been verified.
 
 ## Important limitations
 

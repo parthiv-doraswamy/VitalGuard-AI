@@ -147,3 +147,63 @@ Never use real patient data. Missing or stale observations are unknown, not norm
 - Updated the roadmap to reflect the latest successful live API smoke: PostgreSQL is reported as the active backend.
 - This is not a durability claim. The same synthetic record must still be queried after a controlled restart/redeploy before persistence readiness can be marked complete.
 - External SQL inspection remains blocked by the database network policy; keep the database private rather than adding a broad allowlist.
+
+
+### Phase 46 — Persistence hardening (backend feature branch; hosted verification still pending)
+- Hosted startup can require PostgreSQL with `VITALGUARD_REQUIRE_POSTGRES=true`; the managed database must be configured before enabling the guard.
+- Pooled database connections use explicit connection, statement and idle-transaction timeouts.
+- Observation, alert and alert-audit writes are transactional; WebSocket events are emitted only after commit. Database failures should not return a fake success.
+- Versioned migrations add history indexes and backfill alert timestamps, with an upgrade path for existing v1 databases.
+- Race-safe alert transitions, cursor-paginated alerts, bounded audit/timeline queries, and health diagnostics for backend/durability/schema version.
+- Backup/restore utilities and a process-restart persistence check are included.
+- Local verification was reported for SQLite and disposable PostgreSQL; this is not evidence of hosted restart durability.
+- **Still open:** verify PostgreSQL on the hosted service, enable the Postgres requirement only after confirming its connection string, run a restart-survival check across a hosted restart/redeploy, and complete a backup/restore drill into a separate non-production database. Keep the database private.
+
+### Phase 47 — Synchronized two-laptop streaming (branches `feature/live-demo-backend` + `feature/live-demo-frontend`, not yet deployed)
+- **Laptop A** opens **Live demo** (`/#/live-demo`, Producer), chooses a stable, worsening or recovering scenario and an interval, then explicitly starts the stream. **Laptop B** opens the normal **Dashboard**. Its "Synchronized backend stream" panel updates automatically, with no controls and nothing started on B.
+- The backend owns the stream session. A receives a producer token once (kept in this tab's sessionStorage); pause, resume, stop and emit require it. Only one producer can be active: a second start gets a 409 and must explicitly choose **Take over and start**. An optional `VITALGUARD_STREAM_PRODUCER_KEY` gates who may start a stream.
+- Each tick, A asks the backend for the next **sequence**. The backend generates the fictional observation with the existing deterministic simulator and calculates the prediction. It persists the observation, any alert, and the session advance in one transaction, then broadcasts the committed event. B shows the backend's score and never calculates its own.
+- Event contract: `event_id` (= observation id), `session_id`, `sequence`, `timestamp`, `observation`, `model_version`, `prediction`, `alert`, `server_received_at`, `published_at`, `demo_only`, `data_origin: "synthetic"`. Both laptops display the same event ID, score, model version and timestamp.
+- Reliability:
+  - `(session_id, sequence)` is unique, so a retried or concurrent submission returns the original event and creates no new record, alert or broadcast.
+  - After a reconnect, the client fetches missed events from `/api/v1/live-demo/events?after_id=…` and merges them by `event_id`.
+  - Failed writes return 503 and publish nothing. The producer retries the same sequence, and moves to an error state with **Retry** after 3 consecutive failures.
+- Latency: on A, exact submit → broadcast received on the same device. On B, backend receipt → delivered, corrected by a clock offset from timed WebSocket pings (±½ RTT).
+- The local **Start simulation** bar is relabelled "Local demo simulation · runs in this browser only, not synchronized with other devices".
+- **Verified locally** (PostgreSQL 17 + production build, 2026-10-14):
+  - Backend: 152 tests passing.
+  - Frontend: lint ✔, 35 unit tests ✔, build ✔.
+  - Playwright: 5/5 in a single run plus 2 more runs of the live spec. This includes a real two-browser-context test covering matching event IDs and scores, pause/resume, B disconnect + catch-up with no duplicates, stop with B staying a receiver, the stable scenario, and duplicate-producer refusal/takeover.
+  - Ad-hoc backend outage during a stream: the producer showed an error, then Retry continued with contiguous sequences 0–10.
+- **Run the two-browser test locally:** start the backend with `CORS_ORIGINS=http://127.0.0.1:4173`, build with `VITE_API_BASE_URL=<backend>`, then run `E2E_LIVE_API_URL=<backend> npx playwright test e2e/live-demo.spec.mjs`. Without `E2E_LIVE_API_URL` the spec is skipped, so the existing CI and deployed-route smoke runs are unaffected.
+- **Not yet done:**
+  - Deployment.
+  - A two-physical-laptop run against the deployed services.
+  - A CI job that starts the backend for the live spec.
+  - Cross-instance delivery: the WebSocket hub is in-process and needs a single backend instance.
+  - The producer emit rate limit is per process.
+
+### Phase 48 — Model benchmarking, selection and evaluation UI (`feature/model-benchmark` backend, `feature/model-evaluation-ui` frontend; not yet deployed)
+- The API serves the artifact named in a model registry. If the active artifact fails verification it falls back to the previous one, then to rebuilding the synthetic demo model, and reports which happened. `ml/model_registry.py promote|rollback` manages the registry.
+- `/api/v1/model/info` adds `mode` (explicit **synthetic-demo** while no validated research model exists), `model_source`, the real algorithm, artifact provenance, threshold, selection and `load_error`. The prediction contract is unchanged.
+- Benchmark protocol: logistic regression (baseline) vs Random Forest vs XGBoost on identical features and patient-level splits; validation-only tuning and thresholds; predefined gates; a baseline-first rule with a paired patient bootstrap; selection frozen before test evaluation; metrics recomputable from saved predictions.
+- **Only run on the fictional fixture**, so no algorithm has been selected for the real target. The baseline was kept: Random Forest showed no robust gain, and XGBoost is not loadable by the API runtime.
+- The Settings evaluation panel shows the active model, the synthetic-demo banner, fallback/load errors, a version-mismatch warning, selection metadata, and research-report metrics (null-safe, with the Brier score).
+- **Verified locally (2026-10-14):**
+  - Backend: 188 tests on PostgreSQL + SQLite (Python 3.12 and 3.14).
+  - ML: 46 tests.
+  - Frontend: lint, 40 unit tests and build.
+  - Live API smoke script: all checks pass against this branch.
+  - Playwright: 5/5.
+
+### Phase 49 — Installable Progressive Web App (`feature/pwa`; not yet deployed)
+- One manifest, maskable and standard icons, and one Workbox service worker (`vite-plugin-pwa` 1.3.0, pinned) that precaches the app shell and static assets. Only Google Fonts are cached at runtime; **API responses are never cached**.
+- Prompt-based update flow: a new version waits for **Update now**. Honest offline and stale-data banners; backend actions are disabled offline. The live socket now detects half-open connections (pong watchdog) and browser offline/online.
+- 44 px touch targets, safe-area insets, standalone tweaks.
+- **Verified locally in headless Chromium:** installability check with no errors, a single worker, offline shell, no API data in caches, and the update flow with two real builds. 52 unit tests; Playwright 9/9.
+- **Not verified:** real installation on desktop/Android/iOS devices, and the deployed update flow. See [PWA.md](PWA.md).
+
+### Phase 50 — Web Push notifications (`feature/web-push` backend, `feature/web-push-ui` frontend; not yet deployed)
+- Explicit opt-in in Settings, device-scoped subscriptions (management token; no user accounts exist), severity preference, test send, and an honest delivery list (accepted by the push service vs shown/opened on the device).
+- Push and click handlers are imported into the single PWA service worker. Payloads contain no patient data; clicks open `/#/alerts?alert=ID`, which highlights the alert. The in-app alert center remains the fallback.
+- **Tested:** real Chrome 155 on macOS 26.5.2 through FCM, foreground and background (no window), with device display receipts. **Not tested:** Android, iOS/iPadOS, Edge, Firefox, Safari, OS-level notification clicks, and a fully quit browser. Details are in `docs/WEB_PUSH.md` on the backend branch.

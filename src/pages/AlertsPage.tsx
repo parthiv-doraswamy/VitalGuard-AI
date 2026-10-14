@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { reconcilePush, type PushState } from '../services/notifications.ts';
 import { ArrowRight, BellRing, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Shell } from '../components/layout/Shell.tsx';
 import { PageHeader } from '../components/ui/Primitives.tsx';
@@ -14,6 +15,10 @@ const tabs: { key: AlertStatus | 'all'; label: string }[] = [
 export function AlertsPage() {
   const { alerts, acknowledge, undoAcknowledge, start } = useSimulation();
   const [tab, setTab] = useState<(typeof tabs)[number]['key']>('all');
+  const [params] = useSearchParams();
+  const highlightId = Number(params.get('alert')) || null;
+  const [push, setPush] = useState<PushState | null>(null);
+  useEffect(() => { reconcilePush().then(setPush).catch(() => setPush({ kind: 'off' })); }, []);
   const counts = useMemo(() => ({
     open: alerts.filter((a) => a.status === 'open').length,
     ack: alerts.filter((a) => a.status === 'acknowledged').length,
@@ -25,7 +30,13 @@ export function AlertsPage() {
       <PageHeader eyebrow="Safety signals" title="Alerts"
         subtitle="Prioritized review signals with observed contributors. No treatment advice."
         crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Alerts' }]} />
-      <BackendAlertInbox />
+      {push && push.kind !== 'on' && (
+        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/50 dark:border-slate-700 dark:text-slate-300" data-testid="push-fallback">
+          Push notifications are off on this device. New backend alerts appear here and in the live panel while VitalGuard is open.{' '}
+          <Link to="/settings" className="font-semibold text-teal-700 hover:underline">Notification settings</Link>
+        </p>
+      )}
+      <BackendAlertInbox highlightId={highlightId} />
       <div className="mt-6 grid grid-cols-3 gap-3 md:gap-4 stagger">
         {[
           { l: 'Local demo active', v: counts.open, h: 'Requires review', icon: BellRing, cls: 'text-rose-600 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300' },
