@@ -29,9 +29,11 @@ def test_additive_explanation_reconstructs_active_model_log_odds():
 def test_explanation_check_rejects_missing_values():
     with pytest.raises(ValueError, match="missing required features"):
         validate_additive_explanation({"age": 58})
+    with pytest.raises(ValueError, match="missing required features"):
+        validate_additive_explanation({**VALUES, "spo2": None})
 
 
-@pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf, "not-a-number", None])
+@pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf, "not-a-number"])
 def test_explanation_check_rejects_non_finite_or_non_numeric_values(invalid):
     with pytest.raises(ValueError, match="finite numeric"):
         validate_additive_explanation({**VALUES, "spo2": invalid})
