@@ -8,6 +8,7 @@ from app.main import app
 def client(tmp_path, monkeypatch):
     # Isolate each test so no local or deployed demo history leaks between tests.
     monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "test.sqlite3"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     with TestClient(app) as test_client:
         yield test_client
 
@@ -28,8 +29,11 @@ def valid_payload():
 def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-    assert response.json()["demo_only"] is True
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["demo_only"] is True
+    assert body["database"]["status"] == "ok"
+    assert body["database"]["backend"] == "sqlite"
 
 
 def test_model_info_is_explicit_about_synthetic_data(client):
@@ -94,7 +98,6 @@ def test_history_limit_is_bounded(client):
     assert response.status_code == 422
 
 
-
 def test_postgres_database_url_is_normalized(monkeypatch):
     from app.storage import _database_url
 
@@ -130,7 +133,6 @@ def test_api_returns_baseline_security_headers_and_request_id(client):
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-request-id"]
     assert len(response.headers["x-request-id"]) == 36
-
 
 
 def test_cors_preflight_allows_authorization_for_frontend_posts(client):
