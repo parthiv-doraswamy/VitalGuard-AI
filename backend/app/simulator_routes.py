@@ -21,8 +21,9 @@ class SimulationRequest(BaseModel):
 async def submit_demo_observation(payload: SimulationRequest):
     """Generate, score, persist, then broadcast one fictional observation."""
     values = observation_for_step(payload.scenario, payload.step)
-    # The simulator has never raised alerts; that behavior is kept unchanged.
-    return await record_observation(payload.patient_id, values, raise_alert=False)
+    # Use the same atomic observation + threshold-alert workflow as live streams.
+    # The service commits the observation, alert/audit rows and outbox events together.
+    return await record_observation(payload.patient_id, values, raise_alert=True)
 
 
 live_router = APIRouter(prefix="/api/v1/live-demo", tags=["live-demo-stream"])
