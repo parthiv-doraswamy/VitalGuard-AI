@@ -38,7 +38,7 @@ export function PatientDetailPage() {
   return (
     <Shell title={`Patient ${patient.id}`} subtitle={`${patient.ward} · Bed ${patient.bed}`}>
       <section className="relative overflow-hidden rounded-[24px] text-white p-6 sm:p-7" style={{ background: 'linear-gradient(115deg,#0a1128 0%,#12294d 45%,#0c3f4a 80%,#0f766e 125%)' }} aria-label="Patient summary">
-        <div className="absolute inset-0 vg-grid-bg opacity-40" aria-hidden />
+        <div className="absolute inset-0 vg-grid-bg opacity-40 pointer-events-none" aria-hidden />
         <DetailHeader id={patient.id} ward={patient.ward} bed={patient.bed} age={patient.age} sex={patient.sex} scenario={patient.scenario} updated={patient.updatedAt} />
         <div className="relative mt-4 flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-300"><MapPin size={13} aria-hidden className="text-teal-300" />{patient.ward} · Bed {patient.bed}</span>
