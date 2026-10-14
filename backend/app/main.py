@@ -30,8 +30,16 @@ app.include_router(timeline_router)
 app.include_router(trend_router)
 _default_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://vitalguard-ai-g215.onrender.com"]
 _origins = os.getenv("CORS_ORIGINS", ",".join(_default_origins))
-app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
-    allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in _origins.split(",") if origin.strip()],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    # Frontend API requests can carry the demo bearer token. Browsers preflight
+    # those POSTs; omitting Authorization makes the browser reject them before
+    # the request reaches the API.
+    allow_headers=["Accept", "Authorization", "Content-Type"],
+)
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):

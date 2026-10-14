@@ -130,3 +130,20 @@ def test_api_returns_baseline_security_headers_and_request_id(client):
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-request-id"]
     assert len(response.headers["x-request-id"]) == 36
+
+
+
+def test_cors_preflight_allows_authorization_for_frontend_posts(client):
+    response = client.options(
+        "/api/v1/risk/explain",
+        headers={
+            "Origin": "https://vitalguard-ai-g215.onrender.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://vitalguard-ai-g215.onrender.com"
+    allowed_headers = response.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allowed_headers
+    assert "content-type" in allowed_headers
