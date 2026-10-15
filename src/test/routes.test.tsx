@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
+import { openOfflineSession } from '../services/auth.ts';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SimulationProvider } from '../store/SimulationContext.tsx';
@@ -27,6 +28,7 @@ function wrapRouted(route = '/patients/P-SIM-003') {
   );
 }
 describe('routes render', () => {
+  beforeEach(() => { openOfflineSession('admin.demo'); });
   it('dashboard renders hero + queue', () => {
     wrap(<DashboardPage />);
     expect(screen.getByText('Patient Monitoring Overview')).toBeTruthy();
@@ -35,7 +37,7 @@ describe('routes render', () => {
   });
   it('patient list renders + filters + view toggle', () => {
     wrap(<PatientsPage />);
-    expect(screen.getByText('P-SIM-001')).toBeTruthy();
+    expect(screen.getAllByText(/^P-SIM-0\d\d$/).length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Search patient ID')).toBeTruthy();
     expect(screen.getByLabelText('View mode')).toBeTruthy();
   });

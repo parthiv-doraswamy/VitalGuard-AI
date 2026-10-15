@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSession } from '../../services/useSession.ts';
+import { useScope } from '../../store/useScope.ts';
+import { requestAlertPermission } from '../../services/alertNotifier.ts';
 import { Link } from 'react-router-dom';
 import { Bell, BellOff, Send } from 'lucide-react';
 import {
@@ -23,6 +26,10 @@ function deliveryText(delivery: PushDelivery) {
 
 /** Explicit, device-level opt-in. Push is optional: the alert center always works. */
 export function NotificationSettings() {
+  const session = useSession();
+  const { patients } = useScope();
+  const isDoctor = session?.role === 'doctor';
+  const [permission, setPermission] = useState(() => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission));
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -56,9 +63,18 @@ export function NotificationSettings() {
       <p className="eyebrow flex items-center gap-1.5"><Bell size={13} aria-hidden /> This device</p>
       <h2 id="notifications-heading" className="font-display text-xl font-extrabold mt-1">Alert notifications</h2>
       <p className="text-xs text-slate-500 mt-1">
-        Get a notification when a new synthetic demo alert is created. Notifications never include patient details;
-        open the app to review. Alerts always appear in the <Link to="/alerts" className="font-semibold text-teal-700 hover:underline">alert center</Link>, with or without push.
+        {isDoctor
+          ? <>You are notified when one of your <strong>{patients.length} assigned patients</strong> raises an alert, in real time, including when the installed app is closed (push). Other doctors&apos; patients never notify you.</>
+          : <>Alert pushes go only to each patient&apos;s assigned doctor. As {session?.role === 'admin' ? 'an admin' : 'a nurse'} you see every alert in the app as it happens; enabling push here only allows test notifications.</>}
+        {' '}Notifications show the ward and bed, never names or vitals. Alerts always appear in the <Link to="/alerts" className="font-semibold text-teal-700 hover:underline">alert center</Link>.
       </p>
+      {!session?.token && <p className="mt-2 text-xs text-amber-700">This is an offline session; sign in while the backend is reachable to enable push.</p>}
+      {isDoctor && permission === 'default' && (
+        <button type="button" className="btn-secondary mt-3" onClick={() => { void requestAlertPermission().then((value) => setPermission(value)); }}>
+          <Bell size={14} aria-hidden /> Allow alert pop-ups while VitalGuard is open
+        </button>
+      )}
+      {isDoctor && permission === 'granted' && <p className="mt-2 text-xs text-teal-700">Alert pop-ups are allowed on this device while VitalGuard is open.</p>}
 
       <div className="mt-4" data-testid="push-state">
         {state === null && <p className="text-sm text-slate-500">Checking notification support…</p>}

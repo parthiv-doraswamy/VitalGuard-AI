@@ -48,12 +48,12 @@ export function LiveStatusPanel({ compact = false }: { compact?: boolean }) {
           <p className="eyebrow">Synchronized backend stream</p>
           <h3 className="font-display font-bold text-[16px] tracking-tight flex flex-wrap items-center gap-2">
             <span data-testid="live-session-status">{sessionLabel}</span>
-            {session && <TrendPill trend={session.scenario} />}
+            {session && session.scenario !== 'mixed' && <TrendPill trend={session.scenario} />}
             <DemoPill label="SYNTHETIC · FICTIONAL" />
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
             {ownStream ? 'This device is the producer.' : 'Receiver mode — updates arrive from the backend; nothing is started here.'}
-            {session && <> · patient <span className="font-semibold">{session.patient_id}</span> · session <code data-testid="live-session-id">{session.session_id.slice(0, 8)}</code></>}
+            {session && <> · {session.mode === 'cohort' ? <span className="font-semibold">all {session.patient_count ?? ''} cohort patients</span> : <>patient <span className="font-semibold">{session.patient_id}</span></>} · session <code data-testid="live-session-id">{session.session_id.slice(0, 8)}</code></>}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">

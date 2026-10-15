@@ -1,5 +1,7 @@
 import { createContext } from 'react';
 import type { Patient, RiskSignal, VitalReading, AlertItem } from '../types/index.ts';
+import type { ObservationEvent } from '../services/api.ts';
+import type { BackendAlertSummary } from './liveIngest.ts';
 
 export type ToastSeverity = 'high' | 'critical' | 'info' | 'ok';
 export interface ToastMsg { id: number; title: string; message: string; severity: ToastSeverity; at: string; patientId?: string; }
@@ -28,6 +30,14 @@ export interface SimValue {
   setDataSource: (d: 'demo' | 'api') => void;
   theme: 'light' | 'dark';
   setTheme: (t: 'light' | 'dark') => void;
+  /** Apply committed backend stream observations to the cohort (batched into one render). */
+  ingestObservations: (events: ObservationEvent[]) => void;
+  /** Add or update a backend alert; `announce` shows a toast (and a system notification for the assigned doctor). */
+  ingestAlert: (alert: BackendAlertSummary, options?: { announce?: boolean; riskAfter?: number }) => void;
+  /** Sequence number of the latest applied backend stream tick (null before any). */
+  streamTick: number | null;
+  /** Message from the most recent failed alert action, if any. */
+  alertActionError: string | null;
 }
 export const SimCtx = createContext<SimValue | null>(null);
 

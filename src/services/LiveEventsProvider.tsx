@@ -8,6 +8,10 @@ import {
 } from './liveEvents.ts';
 import { useStreamProducer } from './streamProducer.ts';
 import { LiveEventsContext, type LiveEventsState } from './useLiveEvents.ts';
+import { useSimulation } from '../store/useSimulation.ts';
+import { APP_CONFIG } from './config.ts';
+import { authHeaders } from './auth.ts';
+import type { BackendAlertSummary } from '../store/liveIngest.ts';
 
 const MAX_CATCH_UP_PAGES = 10;
 const LATENCY_WINDOW = 20;
@@ -48,6 +52,9 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
     if (submissions.current.size > 500) submissions.current.delete(submissions.current.keys().next().value as string);
   }, []);
   const producer = useStreamProducer(recordSubmission);
+  // Committed stream events drive the same patient state every page renders (charts, cards, alerts).
+  const { ingestObservations, ingestAlert } = useSimulation();
+  const hydrated = useRef(false);
 
   const reportError = useCallback((message: string) => {
     setErrors((current) => ({ count: current.count + 1, last: message }));
@@ -61,15 +68,49 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
     setEventCount((count) => count + added.length);
     const recovered = added.filter((item) => item.origin === 'recovered').length;
     if (recovered) setRecoveredCount((count) => count + recovered);
+    ingestObservations(added.map((item) => item.event));
     const maxId = Math.max(...added.map((item) => item.event.event_id));
     lastSeenId.current = Math.max(lastSeenId.current ?? 0, maxId);
     for (const item of added) {
       if (item.event.alert && !alertIds.current.has(item.event.alert.id)) {
         alertIds.current.add(item.event.alert.id);
         setAlertsReceived((count) => count + 1);
+        ingestAlert(item.event.alert as BackendAlertSummary,
+          { announce: item.origin === 'live', riskAfter: item.event.prediction.risk_score });
       }
     }
-  }, []);
+  }, [ingestAlert, ingestObservations]);
+
+  /** Latest committed vitals and alerts, so a device that opens mid-stream starts from current values. */
+  const hydrate = useCallback(async () => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    try {
+      const observations = await fetch(`${APP_CONFIG.apiBaseUrl}/api/v1/observations?limit=100`, { signal: AbortSignal.timeout(8000) });
+      if (observations.ok) {
+        const body = await observations.json() as { items: Array<{ id: number; patient_id: string; created_at: string; inputs: Record<string, number>; prediction: { risk_score: number; risk_level: string; model_probability?: number }; session_id?: string | null; sequence?: number | null; model_version: string }> };
+        ingestObservations(body.items.map((record) => ({
+          type: 'observation.created', event_id: record.id, observation_id: record.id, session_id: record.session_id ?? null,
+          sequence: record.sequence ?? null, patient_id: record.patient_id, created_at: record.created_at, timestamp: record.created_at,
+          observation: record.inputs, model_version: record.model_version, prediction: record.prediction, alert: null,
+          server_received_at: null, published_at: null, demo_only: true, data_origin: 'synthetic',
+        })));
+      }
+      const headers = authHeaders();
+      if (headers.Authorization) {
+        const alerts = await fetch(`${APP_CONFIG.apiBaseUrl}/api/v1/alerts?limit=100`, { headers, signal: AbortSignal.timeout(8000) });
+        if (alerts.ok) {
+          const body = await alerts.json() as { items: BackendAlertSummary[] };
+          for (const alert of body.items) {
+            alertIds.current.add(alert.id);
+            ingestAlert(alert);
+          }
+        }
+      }
+    } catch {
+      hydrated.current = false; // try again on the next reconnect
+    }
+  }, [ingestAlert, ingestObservations]);
 
   const applySession = useCallback((next: StreamSession | null) => {
     sessionRef.current = next;
@@ -99,6 +140,7 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
           if (result.next_after_id === null) break;
         }
       }
+      await hydrate();
       await refreshSession();
       setLastCatchUpAt(new Date().toISOString());
     } catch (error) {
@@ -106,7 +148,7 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
     } finally {
       catchingUp.current = false;
     }
-  }, [addEvents, refreshSession, reportError]);
+  }, [addEvents, hydrate, refreshSession, reportError]);
 
   const onEvent = useCallback((event: LiveEvent) => {
     if (event.type === 'observation.created') {
@@ -122,7 +164,10 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
       if (!alertIds.current.has(event.alert.id)) {
         alertIds.current.add(event.alert.id);
         setAlertsReceived((count) => count + 1);
+        ingestAlert(event.alert, { announce: true });
       }
+    } else if (event.type === 'alert.updated') {
+      ingestAlert(event.alert);
     } else if (event.type === 'stream.state') {
       const current = sessionRef.current;
       // A stop for an older session must not hide a newer active one.
@@ -132,7 +177,7 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
     } else if (event.type === 'error') {
       reportError(event.detail ?? 'Live channel error');
     }
-  }, [addEvents, applySession, reportError]);
+  }, [addEvents, applySession, ingestAlert, reportError]);
 
   const onClockSample = useCallback((sample: ClockSample) => {
     clockSamples.current = [...clockSamples.current.slice(-4), sample];

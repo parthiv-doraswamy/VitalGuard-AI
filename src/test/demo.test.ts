@@ -5,10 +5,11 @@ import { resolveDataSource } from '../services/dataProvider.ts';
 
 describe('demo mode works without backend', () => {
   it('resolves to demo by default', () => { expect(resolveDataSource()).toBe('demo'); });
-  it('patient list renders (8 synthetic patients)', () => {
+  it('patient list renders (40 synthetic patients, each assigned to a doctor)', () => {
     const ps = demoDataService.listPatients();
-    expect(ps).toHaveLength(8);
+    expect(ps).toHaveLength(40);
     expect(ps.map((p) => p.id)).toContain('P-SIM-003');
+    expect(ps.every((p) => p.name && p.assignedDoctor)).toBe(true);
   });
   it('hero patient has worsening trajectory', () => {
     const r = demoDataService.risk('P-SIM-003');
@@ -16,8 +17,9 @@ describe('demo mode works without backend', () => {
     expect(r?.news2).toBe(7);
   });
   it('vitals render for detail', () => {
-    const v = demoDataService.latestVitals('P-SIM-003');
-    expect(v?.heartRate).toBeGreaterThan(100);
+    // Recovering patients start from abnormal shared-cohort baselines.
+    const v = demoDataService.latestVitals('P-SIM-004');
+    expect(v?.heartRate).toBeGreaterThan(95);
     expect(demoDataService.vitalsHistory('P-SIM-003').length).toBeGreaterThan(3);
   });
   it('risk panel + factors render', () => {

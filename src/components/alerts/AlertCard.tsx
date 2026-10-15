@@ -1,4 +1,5 @@
 import { CheckCheck, Undo2, BellRing, Siren, Info, CheckCircle2, Stethoscope } from 'lucide-react';
+import { useCan } from '../../services/useSession.ts';
 import { formatTimeAgo } from '../../utils/format.ts';
 import type { AlertItem, AlertSeverity } from '../../types/index.ts';
 const SEV = {
@@ -8,6 +9,9 @@ const SEV = {
   info: { cls: 'bg-cyan-50 text-cyan-800 border border-cyan-200 dark:bg-cyan-950/50 dark:text-cyan-200 dark:border-cyan-900/60', style: undefined, Icon: Info },
 } as const;
 export function AlertCard({ a, onAck, onReopen }: { a: AlertItem; onAck: () => void; onReopen: () => void }) {
+  const canAck = useCan('acknowledgeAlert');
+  // Backend alerts follow the server lifecycle (open → acknowledged → resolved) and cannot be re-opened here.
+  const fromBackend = a.id.startsWith('BE-');
   const sev: AlertSeverity = a.severity;
   const entry = SEV[sev];
   const { cls, Icon } = entry;
@@ -37,9 +41,9 @@ export function AlertCard({ a, onAck, onReopen }: { a: AlertItem; onAck: () => v
         {a.contributors.map((c: string) => <li key={c} className="px-2 py-1 rounded-lg bg-slate-900/[0.04] dark:bg-white/[0.06] text-[11px] font-semibold">{c}</li>)}
       </ul>
       <div className="mt-4 flex gap-2">
-        {a.status === 'open'
-          ? <button onClick={onAck} className="btn-primary !py-2"><CheckCheck size={15} aria-hidden /> Acknowledge</button>
-          : <button onClick={onReopen} className="btn-secondary !py-2"><Undo2 size={15} aria-hidden /> Reopen</button>}
+        {a.status === 'open' && canAck && <button onClick={onAck} className="btn-primary !py-2"><CheckCheck size={15} aria-hidden /> Acknowledge</button>}
+        {a.status !== 'open' && !fromBackend && <button onClick={onReopen} className="btn-secondary !py-2"><Undo2 size={15} aria-hidden /> Reopen</button>}
+        {fromBackend && <span className="self-center text-[11px] text-slate-400">Live backend alert · resolve it in the backend alert inbox</span>}
       </div>
     </article>
   );

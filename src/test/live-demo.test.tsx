@@ -5,6 +5,7 @@ import type { ObservationEvent, StreamSession } from '../services/api.ts';
 import { clockSampleFromPong, deliveryLatencyMs, mergeEvents, type LoggedEvent } from '../services/liveEvents.ts';
 import { useStreamProducer } from '../services/streamProducer.ts';
 import { LiveEventsProvider } from '../services/LiveEventsProvider.tsx';
+import { SimulationProvider } from '../store/SimulationContext.tsx';
 import { DEFAULT_LIVE_STATE, LiveEventsContext } from '../services/useLiveEvents.ts';
 import { LiveStatusPanel } from '../components/live/LiveStatusPanel.tsx';
 import { LiveEventLog } from '../components/live/LiveEventLog.tsx';
@@ -164,7 +165,7 @@ describe('live events provider', () => {
       }
       return jsonResponse({});
     }));
-    render(<MemoryRouter><LiveEventsProvider><LiveStatusPanel /></LiveEventsProvider></MemoryRouter>);
+    render(<SimulationProvider><MemoryRouter><LiveEventsProvider><LiveStatusPanel /></LiveEventsProvider></MemoryRouter></SimulationProvider>);
 
     await act(async () => { FakeSocket.instances[0].open(); });
     await waitFor(() => expect(screen.getByTestId('live-session-status')).toHaveTextContent('Streaming'));

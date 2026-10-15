@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.ts';
+import { authHeaders } from './auth.ts';
 
 /**
  * Web Push opt-in for this browser (device-scoped; there are no user accounts).
@@ -63,7 +64,7 @@ export function urlBase64ToUint8Array(base64: string): Uint8Array {
 
 async function request<T>(path: string, init: RequestInit & { token?: string; json?: unknown } = {}): Promise<T> {
   const { token, json, ...rest } = init;
-  const headers = new Headers(rest.headers);
+  const headers = new Headers({ ...authHeaders(), ...Object.fromEntries(new Headers(rest.headers)) });
   if (json !== undefined) headers.set('Content-Type', 'application/json');
   if (token) headers.set('X-Subscription-Token', token);
   const response = await fetch(`${API()}${path}`, {

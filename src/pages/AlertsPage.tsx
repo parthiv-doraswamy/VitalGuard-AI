@@ -6,6 +6,8 @@ import { Shell } from '../components/layout/Shell.tsx';
 import { PageHeader } from '../components/ui/Primitives.tsx';
 import { EmptyState } from '../components/ui/States.tsx';
 import { useSimulation } from '../store/useSimulation.ts';
+import { useScope } from '../store/useScope.ts';
+import { useMonitoring } from '../store/useMonitoring.ts';
 import { AlertCard } from '../components/alerts/AlertCard.tsx';
 import { BackendAlertInbox } from '../components/alerts/BackendAlertInbox.tsx';
 import type { AlertStatus } from '../types/index.ts';
@@ -13,7 +15,9 @@ const tabs: { key: AlertStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' }, { key: 'open', label: 'Open' }, { key: 'acknowledged', label: 'Acknowledged' }, { key: 'resolved', label: 'Resolved' },
 ];
 export function AlertsPage() {
-  const { alerts, acknowledge, undoAcknowledge, start } = useSimulation();
+  const { acknowledge, undoAcknowledge, alertActionError } = useSimulation();
+  const monitoring = useMonitoring();
+  const { alerts } = useScope();
   const [tab, setTab] = useState<(typeof tabs)[number]['key']>('all');
   const [params] = useSearchParams();
   const highlightId = Number(params.get('alert')) || null;
@@ -50,12 +54,13 @@ export function AlertsPage() {
         {tabs.map((t) => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={`tab-btn ${tab === t.key ? 'tab-on' : 'tab-off'}`}>{t.label}</button>
         ))}
-        <Link to="/patients/P-SIM-003" className="btn-ghost !text-[13px] ml-auto">Open P-SIM-003 <ArrowRight size={14} aria-hidden /></Link>
+        <Link to="/patients" className="btn-ghost !text-[13px] ml-auto">Open patients <ArrowRight size={14} aria-hidden /></Link>
       </div>
+      {alertActionError && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{alertActionError}</p>}
       {rows.length === 0 ? (
         <div className="mt-4">
-          <EmptyState icon="alert" title="No local demo alerts" hint="The local simulator has no signals in this filter."
-            action={<button onClick={start} className="btn-primary">Start Live Simulation</button>} />
+          <EmptyState icon="alert" title="No alerts in this filter" hint={monitoring.canControl ? 'Start live monitoring to stream vitals and raise alerts.' : 'Alerts for your patients appear here as soon as the live stream raises them.'}
+            action={monitoring.canControl && !monitoring.running ? <button onClick={monitoring.start} className="btn-primary">Start live monitoring</button> : undefined} />
         </div>
       ) : (
         <div className="mt-4 grid xl:grid-cols-2 gap-3 items-start">
