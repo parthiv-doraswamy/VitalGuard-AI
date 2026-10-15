@@ -1,9 +1,12 @@
 """Web Push notifications for committed demo alerts (synthetic data only).
 
-Ownership: there is no user identity in this deployment, so a subscription is
-device-scoped. Registering returns a management token once (only its SHA-256
-hash is stored); changing, testing or removing the subscription requires it.
-Role-based targeting is not possible until real authentication exists.
+Ownership: a subscription belongs to one device and is registered by a signed-in
+demo user (see auth.py). Registering returns a management token once (only its
+SHA-256 hash is stored); changing, testing or removing the subscription requires it.
+
+Targeting: an alert is pushed only to devices registered by the doctor assigned to
+the alert's patient (data/cohort.json). Nurses, admins and anonymous devices
+receive test pushes only and see alerts in the app.
 
 Flow
 1. insert_alert() calls enqueue_for_alert() inside the alert's transaction, so a
@@ -41,6 +44,7 @@ from sqlalchemy import delete, desc, func, insert, select, update
 from sqlalchemy.engine import Connection
 from starlette.concurrency import run_in_threadpool
 
+from .cohort import assigned_doctor, get_patient
 from .storage import get_engine
 from .storage_schema import push_deliveries, push_subscriptions
 
@@ -144,10 +148,12 @@ def public_subscription(row: Any) -> dict[str, Any]:
     return {"subscription_id": row["id"], "status": row["status"], "enabled": bool(row["enabled"]),
             "min_severity": row["min_severity"], "created_at": _iso(row["created_at"]),
             "last_success_at": _iso(row["last_success_at"]), "last_failure_at": _iso(row["last_failure_at"]),
-            "consecutive_failures": row["consecutive_failures"], "expired_reason": row["expired_reason"]}
+            "consecutive_failures": row["consecutive_failures"], "expired_reason": row["expired_reason"],
+            "username": row.get("username"), "role": row.get("role")}
 
 
-def register(endpoint: str, p256dh: str, auth: str, min_severity: str, receipt_base: str | None) -> tuple[dict[str, Any], str]:
+def register(endpoint: str, p256dh: str, auth: str, min_severity: str, receipt_base: str | None,
+             username: str | None = None, role: str | None = None) -> tuple[dict[str, Any], str]:
     """Create or re-register a subscription; returns (subscription, management_token shown once).
 
     Re-registering an existing endpoint (only the browser that owns it knows the
@@ -165,7 +171,9 @@ def register(endpoint: str, p256dh: str, auth: str, min_severity: str, receipt_b
             push_subscriptions.c.endpoint_hash == endpoint_hash)).scalar()
         values = {"endpoint": endpoint, "p256dh": p256dh, "auth": auth, "token_hash": _hash(token),
                   "min_severity": min_severity, "enabled": True, "status": "active", "receipt_base": receipt_base,
-                  "updated_at": now, "consecutive_failures": 0, "expired_reason": None}
+                  "updated_at": now, "consecutive_failures": 0, "expired_reason": None,
+                  # Re-registering from the same device moves it to whoever is signed in now.
+                  "username": username, "role": role}
         if existing:
             connection.execute(update(push_subscriptions).where(push_subscriptions.c.id == existing).values(**values))
             subscription_id = existing
@@ -225,11 +233,13 @@ def unregister(subscription_id: str, token: str | None) -> None:
 # --- Payloads and enqueueing --------------------------------------------------------------
 
 def alert_payload(alert: dict[str, Any]) -> dict[str, Any]:
-    """Lock-screen safe: no patient identifier, vitals, scores or free text from the alert."""
+    """Lock-screen safe: no patient name, vitals or scores; only the fictional bed/ward label."""
     severity = alert["severity"] if alert["severity"] in SEVERITY_RANK else "high"
+    patient = get_patient(alert.get("patient_id", ""))
+    where = f" ({patient['ward']} · bed {patient['bed']})" if patient else ""
     return {"v": 1, "type": "alert", "alert_id": alert["id"], "severity": severity,
-            "title": f"VitalGuard: {severity} demo alert",
-            "body": "A new synthetic demo alert needs review. Open VitalGuard to see it.",
+            "title": f"VitalGuard: {severity} alert{where}",
+            "body": "One of your assigned demo patients needs review. Open VitalGuard to see it.",
             "url": f"/#/alerts?alert={int(alert['id'])}", "tag": f"vg-alert-{int(alert['id'])}"}
 
 
@@ -239,10 +249,14 @@ def test_payload() -> dict[str, Any]:
 
 
 def enqueue_for_alert(connection: Connection, alert: dict[str, Any]) -> int:
-    """Queue one delivery per eligible active subscription, inside the alert's transaction."""
+    """Queue one delivery per active subscription of the patient's assigned doctor, inside the alert's transaction."""
+    doctor = assigned_doctor(alert.get("patient_id", ""))
+    if doctor is None:
+        return 0
     rank = SEVERITY_RANK.get(alert.get("severity"), 0)
     eligible = [row for row in connection.execute(select(push_subscriptions.c.id, push_subscriptions.c.min_severity).where(
-        push_subscriptions.c.status == "active", push_subscriptions.c.enabled.is_(True))).all()
+        push_subscriptions.c.status == "active", push_subscriptions.c.enabled.is_(True),
+        push_subscriptions.c.username == doctor)).all()
         if rank >= SEVERITY_RANK.get(row.min_severity, 1)]
     if not eligible:
         return 0

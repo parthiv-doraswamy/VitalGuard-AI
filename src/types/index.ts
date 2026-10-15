@@ -5,6 +5,10 @@ export type Ward = 'ICU' | 'Emergency' | 'General Ward' | 'Cardiology';
 
 export interface Patient {
   id: string;
+  /** Fictional display name. */
+  name: string;
+  /** Username of the doctor this patient is assigned to. */
+  assignedDoctor: string;
   age: number;
   sex: 'M' | 'F';
   ward: Ward;

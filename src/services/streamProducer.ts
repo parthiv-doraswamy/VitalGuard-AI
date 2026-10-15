@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, liveDemoApi } from './api.ts';
-import type { ObservationEvent, StreamScenario, StreamSession } from './api.ts';
+import type { ObservationEvent, StreamMode, StreamScenario, StreamSession } from './api.ts';
 
 export type ProducerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'stopped' | 'conflict' | 'error';
 
@@ -16,7 +16,7 @@ export interface ProducerState {
   conflict: StreamSession | null;
 }
 
-export interface StartOptions { scenario: StreamScenario; intervalMs: number; producerKey?: string; takeover?: boolean }
+export interface StartOptions { scenario: StreamScenario; intervalMs: number; producerKey?: string; takeover?: boolean; mode?: StreamMode }
 
 const STORAGE_KEY = 'vg-live-producer';
 const MAX_CONSECUTIVE_FAILURES = 3;
@@ -145,7 +145,7 @@ export function useStreamProducer(onSubmit?: (sessionId: string, sequence: numbe
     halt();
     update({ ...INITIAL, phase: 'starting' });
     try {
-      const result = await liveDemoApi.start({ scenario: options.scenario, interval_ms: options.intervalMs, takeover: options.takeover },
+      const result = await liveDemoApi.start({ scenario: options.scenario, interval_ms: options.intervalMs, takeover: options.takeover, mode: options.mode ?? 'cohort' },
         options.producerKey);
       owner.current = { sessionId: result.session.session_id, token: result.producer_token };
       writeStored(owner.current);

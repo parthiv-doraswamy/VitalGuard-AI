@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "resolveJsonModule": true,
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
@@ -18,5 +19,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "vitest/globals", "vite-plugin-pwa/client"]
   },
-  "include": ["src"]
+  "include": ["src", "backend/app/data/*.json", "backend/app/model_artifacts/*.json"]
 }

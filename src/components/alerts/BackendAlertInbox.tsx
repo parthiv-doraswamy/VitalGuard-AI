@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock3, History, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
+import { authHeaders, handleUnauthorized } from '../../services/auth.ts';
+import { useCan } from '../../services/useSession.ts';
 import { useOnlineStatus } from '../../services/pwa.ts';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
 
@@ -39,7 +41,7 @@ function operatorEscalationToken(): string | null {
 }
 
 async function apiRequest<T>(path: string, init?: RequestInit, bearerToken?: string): Promise<T> {
-  const headers = new Headers(init?.headers);
+  const headers = new Headers({ ...authHeaders(), ...Object.fromEntries(new Headers(init?.headers)) });
   if (bearerToken) headers.set('Authorization', 'Bearer ' + bearerToken);
   // Avoid unnecessary browser CORS preflights on GET requests.
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -48,13 +50,16 @@ async function apiRequest<T>(path: string, init?: RequestInit, bearerToken?: str
     headers,
     signal: AbortSignal.timeout(8000),
   });
-  if (!response.ok) throw new Error(`Alert API request failed (${response.status})`);
+  if (response.status === 401 && !bearerToken) handleUnauthorized();
+  if (!response.ok) throw new Error(response.status === 403 ? 'Your role cannot do this for this patient.' : `Alert API request failed (${response.status})`);
   return response.json() as Promise<T>;
 }
 
 /** `highlightId` comes from a notification click (/#/alerts?alert=ID). */
 export function BackendAlertInbox({ highlightId = null }: { highlightId?: number | null } = {}) {
   const { alertsReceived, status } = useLiveEvents();
+  const canAcknowledge = useCan('acknowledgeAlert');
+  const canResolve = useCan('resolveAlert');
   const online = useOnlineStatus();
   const [items, setItems] = useState<BackendAlert[]>([]);
   const [filter, setFilter] = useState<'all' | BackendAlert['status']>('all');
@@ -109,7 +114,7 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
     try {
       await apiRequest(`/api/v1/alerts/${id}/${action}`, {
         method: 'POST',
-        body: JSON.stringify({ actor: 'demo-operator' }),
+        body: JSON.stringify({}),
       });
       await load();
     } catch {
@@ -204,8 +209,8 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
                 <button className="btn-secondary !text-xs" aria-expanded={expandedId === alert.id} onClick={() => void showAudit(alert.id)}>
                   <History size={13} /> Audit trail <ChevronDown size={13} className={expandedId === alert.id ? 'rotate-180' : ''} />
                 </button>
-                {alert.status === 'open' && <button className="btn-secondary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
-                {alert.status !== 'resolved' && <button className="btn-primary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
+                {alert.status === 'open' && canAcknowledge && <button className="btn-secondary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'acknowledge')}>Acknowledge</button>}
+                {alert.status !== 'resolved' && canResolve && <button className="btn-primary !text-xs" disabled={busyId === alert.id || !online} title={online ? undefined : 'Unavailable offline'} onClick={() => void transition(alert.id, 'resolve')}>Resolve</button>}
               </div>
               {expandedId === alert.id && <div className="w-full basis-full rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3">
                 <p className="text-xs font-bold flex items-center gap-1.5"><History size={13} /> Alert audit timeline</p>
@@ -217,7 +222,7 @@ export function BackendAlertInbox({ highlightId = null }: { highlightId?: number
                       <p className="text-[11px] text-slate-500 mt-0.5">{event.actor} · {new Date(event.created_at).toLocaleString()}</p>
                     </li>)}
                   </ol>}
-                <p className="text-[10px] text-slate-400 mt-2">Demo audit only; the actor label is not verified identity.</p>
+                <p className="text-[10px] text-slate-400 mt-2">Actors are the signed-in demo accounts that made each change.</p>
               </div>}
             </article>
           ))}

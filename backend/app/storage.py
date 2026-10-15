@@ -220,6 +220,17 @@ def get_stream_observation(session_id: str, sequence: int) -> dict[str, Any] | N
     return _serialize(row) if row else None
 
 
+def list_stream_observations(session_id: str, sequence: int,
+                             connection: Connection | None = None) -> list[dict[str, Any]]:
+    """Every observation a stream committed for one sequence (one per patient in cohort mode)."""
+    query = select(_OBSERVATIONS).where(_OBSERVATIONS.c.session_id == session_id,
+                                        _OBSERVATIONS.c.sequence == sequence).order_by(_OBSERVATIONS.c.id)
+    if connection is not None:
+        return [_serialize(row) for row in connection.execute(query).mappings().all()]
+    with get_engine().connect() as own:
+        return [_serialize(row) for row in own.execute(query).mappings().all()]
+
+
 def _serialize(row: Any) -> dict[str, Any]:
     created_at = row["created_at"]
     if hasattr(created_at, "isoformat"):

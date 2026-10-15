@@ -76,6 +76,8 @@ class StreamStartRequest(BaseModel):
 
     scenario: Literal["stable", "worsening", "recovering"] = "worsening"
     patient_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    # "cohort" drives every existing demo patient along its own scenario (scenario is then ignored).
+    mode: Literal["patient", "cohort"] = "patient"
     interval_ms: int = Field(default=2000, ge=500, le=10000)
     takeover: bool = False
 

@@ -1,24 +1,28 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Bell, BarChart3, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X, History } from 'lucide-react';
-import { useSimulation } from '../../store/useSimulation.ts';
+import { Activity, Bell, BarChart3, BrainCircuit, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X, History } from 'lucide-react';
+import { useScope } from '../../store/useScope.ts';
+import { can, type Permission } from '../../services/auth.ts';
+import { useSession } from '../../services/useSession.ts';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/live-demo', label: 'Live demo', icon: Radio },
-  { to: '/patients', label: 'Patients', icon: Users },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
-  { to: '/history', label: 'History', icon: History },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/settings', label: 'Settings', icon: Settings },
+const links: { to: string; label: string; icon: typeof Bell; permission: Permission }[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
+  { to: '/live-demo', label: 'Live demo', icon: Radio, permission: 'liveDemo' },
+  { to: '/patients', label: 'Patients', icon: Users, permission: 'patients' },
+  { to: '/alerts', label: 'Alerts', icon: Bell, permission: 'alerts' },
+  { to: '/history', label: 'History', icon: History, permission: 'history' },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3, permission: 'analytics' },
+  { to: '/model-performance', label: 'Model performance', icon: BrainCircuit, permission: 'modelPerformance' },
+  { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings' },
 ];
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
-  const { alerts } = useSimulation();
+  const { alerts } = useScope();
+  const session = useSession();
   const open = alerts.filter((a) => a.status === 'open').length;
   return (
     <nav className="px-3 py-3 space-y-1" aria-label="Primary">
-      {links.map(({ to, label, icon: Icon }) => (
+      {links.filter((link) => can(session, link.permission)).map(({ to, label, icon: Icon }) => (
         <NavLink key={to} to={to} onClick={onNavigate}
           className={({ isActive }) => `vg-navlink group ${isActive
             ? 'text-white shadow-[0_8px_22px_-8px_rgba(13,148,136,0.7)]'
@@ -58,8 +62,19 @@ function Brand() {
 }
 
 function SideFoot() {
+  const session = useSession();
   return (
-    <div className="mt-auto p-4">
+    <div className="mt-auto p-4 space-y-2">
+      {session && (
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3.5" data-testid="signed-in-user">
+          <p className="text-[13px] font-bold text-white truncate">{session.displayName}</p>
+          <p className="mt-1 text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span className="rounded-md bg-teal-400/15 px-1.5 py-0.5 font-bold uppercase tracking-wider text-teal-200">{session.role}</span>
+            <span className="truncate">{session.role === 'doctor' ? session.wards.join(', ') : 'All wards'}</span>
+          </p>
+          {!session.token && <p className="mt-1.5 text-[10px] text-amber-300">Offline session · backend not reached</p>}
+        </div>
+      )}
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3.5">
         <p className="text-[11px] font-bold flex items-center gap-1.5 text-emerald-300">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" aria-hidden />

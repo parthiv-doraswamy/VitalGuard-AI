@@ -5,23 +5,28 @@ import { resolveDataSource } from '../services/dataProvider.ts';
 
 describe('demo mode works without backend', () => {
   it('resolves to demo by default', () => { expect(resolveDataSource()).toBe('demo'); });
-  it('patient list renders (8 synthetic patients)', () => {
+  it('patient list renders (40 synthetic patients, each assigned to a doctor)', () => {
     const ps = demoDataService.listPatients();
-    expect(ps).toHaveLength(8);
+    expect(ps).toHaveLength(40);
     expect(ps.map((p) => p.id)).toContain('P-SIM-003');
+    expect(ps.every((p) => p.name && p.assignedDoctor)).toBe(true);
   });
-  it('hero patient has worsening trajectory', () => {
-    const r = demoDataService.risk('P-SIM-003');
-    expect(r?.trajectory).toEqual([32, 41, 55, 70, 82, 87]);
-    expect(r?.news2).toBe(7);
+  it('initial risk matches where the backend stream starts', () => {
+    // Worsening patients start with normal vitals (low risk); recovering ones start high and fall.
+    const worsening = demoDataService.risk('P-SIM-003')!;
+    const recovering = demoDataService.risk('P-SIM-004')!;
+    expect(worsening.score).toBeLessThan(40);
+    expect(worsening.trajectory[worsening.trajectory.length - 1]).toBeGreaterThan(worsening.trajectory[0]);
+    expect(recovering.level).toBe('high');
+    expect(recovering.trajectory[recovering.trajectory.length - 1]).toBeLessThan(recovering.trajectory[0]);
   });
   it('vitals render for detail', () => {
-    const v = demoDataService.latestVitals('P-SIM-003');
-    expect(v?.heartRate).toBeGreaterThan(100);
+    // Recovering patients start from abnormal shared-cohort baselines.
+    const v = demoDataService.latestVitals('P-SIM-004');
+    expect(v?.heartRate).toBeGreaterThan(95);
     expect(demoDataService.vitalsHistory('P-SIM-003').length).toBeGreaterThan(3);
   });
   it('risk panel + factors render', () => {
-    expect(demoDataService.risk('P-SIM-003')?.score).toBe(87);
     expect(demoDataService.factors('P-SIM-003').length).toBe(5);
   });
   it('alerts + acknowledgement data', () => {

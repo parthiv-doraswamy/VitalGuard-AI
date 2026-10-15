@@ -9,10 +9,15 @@ import { EmptyState } from '../components/ui/States.tsx';
 import { FilterBar, useFilterState } from '../components/patients/FilterBar.tsx';
 import { PatientRows, PatientCards } from '../components/patients/Directory.tsx';
 import { useSimulation } from '../store/useSimulation.ts';
+import { useScope } from '../store/useScope.ts';
+import { useMonitoring } from '../store/useMonitoring.ts';
 
 const PAGE = 6;
 export function PatientsPage() {
-  const { patients, risks, latest, running, start, pause, tick } = useSimulation();
+  const { risks, latest } = useSimulation();
+  const { patients, scope } = useScope();
+  const monitoring = useMonitoring();
+  const { running, tick } = monitoring;
   const [filters, setFilters] = useFilterState();
   const [view, setView] = useState<'table' | 'cards'>('table');
   const [page, setPage] = useState(0);
@@ -35,7 +40,7 @@ export function PatientsPage() {
   const onFilter = (v: typeof filters) => { setFilters(v); setPage(0); };
   return (
     <Shell title="Patients" subtitle="Monitored patient directory">
-      <PageHeader eyebrow={`Census · ${patients.length} patients`} title="Patients"
+      <PageHeader eyebrow={`Census · ${patients.length} ${scope === 'assigned' ? 'assigned ' : ''}patients`} title={scope === 'assigned' ? 'My patients' : 'Patients'}
         subtitle="Monitor patient state, vital trends, and risk signals across wards."
         crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Patients' }]}
         actions={(
@@ -48,11 +53,13 @@ export function PatientsPage() {
         <div className="flex items-center gap-3">
           <span className={`grid h-10 w-10 place-items-center rounded-xl ${running ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}><Activity size={19} /></span>
           <div><p className="font-semibold text-slate-900 dark:text-slate-100">{running ? 'Live synthetic monitoring is running' : 'Live monitoring demo is paused'}</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400">{running ? `All ${patients.length} demo patients refresh automatically · update #${tick}` : 'Start the stream to update vitals, risk signals and generate threshold alerts.'}</p></div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">{running ? `${monitoring.sourceLabel} · update #${tick}` : monitoring.canControl ? 'Start the stream to update vitals, risk signals and generate threshold alerts.' : 'Vitals update here as soon as an admin or nurse starts the live stream.'}</p></div>
         </div>
-        <button type="button" onClick={running ? pause : start} className="btn-primary inline-flex items-center gap-2" aria-pressed={running}>
-          {running ? <><Pause size={15} /> Pause stream</> : <><Play size={15} /> Start live demo</>}
-        </button>
+        {monitoring.canControl && (
+          <button type="button" onClick={running ? monitoring.pause : monitoring.start} disabled={monitoring.busy || (running && !monitoring.canPause)} className="btn-primary inline-flex items-center gap-2" aria-pressed={running}>
+            {running ? <><Pause size={15} /> Pause stream</> : <><Play size={15} /> Start live demo</>}
+          </button>
+        )}
       </div>
       <div className="mt-4"><FilterBar value={filters} onChange={onFilter} resultCount={rows.length} /></div>
       {slice.length === 0 ? (

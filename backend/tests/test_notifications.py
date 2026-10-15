@@ -31,8 +31,13 @@ from app.alert_service import create_alert
 from app.main import app
 from app.storage import get_engine
 from app.storage_schema import push_deliveries, push_subscriptions
+from conftest import auth_headers
 
-ELEVATED = {"patient_id": "DEMO-PUSH-PATIENT-7", "age": 70, "heart_rate": 180, "spo2": 78, "systolic_bp": 80,
+AUTH = auth_headers()
+# Alerts are pushed only to the assigned doctor: these ICU patients belong to doctor.demo.
+DOCTOR = auth_headers("doctor.demo")
+
+ELEVATED = {"patient_id": "P-SIM-006", "age": 70, "heart_rate": 180, "spo2": 78, "systolic_bp": 80,
             "diastolic_bp": 50, "temperature": 39.5, "respiratory_rate": 34}
 b64 = lambda raw: base64.urlsafe_b64encode(raw).decode().rstrip("=")  # noqa: E731
 unb64 = lambda text: base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))  # noqa: E731
@@ -114,8 +119,9 @@ def vapid(monkeypatch, push_service):
     return key
 
 
-def register(client, browser, **body):
-    response = client.post("/api/v1/notifications/subscriptions", json={"subscription": browser.subscription, **body})
+def register(client, browser, headers=None, **body):
+    response = client.post("/api/v1/notifications/subscriptions", headers=headers or DOCTOR,
+                           json={"subscription": browser.subscription, **body})
     assert response.status_code == 201, response.text
     data = response.json()
     return data["subscription"]["subscription_id"], data["management_token"]
@@ -172,19 +178,19 @@ def test_config_serves_the_public_key_derived_from_the_private_key(database, vap
 def test_registration_only_accepts_real_push_services(database, vapid, monkeypatch, endpoint, error):
     monkeypatch.delenv("VITALGUARD_PUSH_ALLOWED_HOSTS")
     with TestClient(app) as client:
-        response = client.post("/api/v1/notifications/subscriptions", json={"subscription": FakeBrowser(endpoint).subscription})
+        response = client.post("/api/v1/notifications/subscriptions", headers=AUTH, json={"subscription": FakeBrowser(endpoint).subscription})
     assert response.status_code == 422 and response.json()["error"] == error
 
 
 def test_registration_requires_https_and_valid_keys(database, vapid, monkeypatch, push_service):
     monkeypatch.setenv("VITALGUARD_PUSH_ALLOW_INSECURE_ENDPOINTS", "false")
     with TestClient(app) as client:
-        insecure = client.post("/api/v1/notifications/subscriptions",
+        insecure = client.post("/api/v1/notifications/subscriptions", headers=AUTH,
                                json={"subscription": FakeBrowser(push_service.endpoint("insecure")).subscription})
         monkeypatch.setenv("VITALGUARD_PUSH_ALLOW_INSECURE_ENDPOINTS", "true")
         bad = FakeBrowser(push_service.endpoint("badkeys")).subscription
         bad["keys"]["p256dh"] = b64(b"\x05" + os.urandom(64))
-        bad_keys = client.post("/api/v1/notifications/subscriptions", json={"subscription": bad})
+        bad_keys = client.post("/api/v1/notifications/subscriptions", headers=AUTH, json={"subscription": bad})
     assert insecure.json()["error"] == "endpoint_not_https"
     assert bad_keys.json()["error"] == "invalid_keys"
 
@@ -229,7 +235,7 @@ def test_subscription_limit(database, vapid, monkeypatch, push_service):
     monkeypatch.setenv("VITALGUARD_PUSH_MAX_SUBSCRIPTIONS", "1")
     with TestClient(app) as client:
         register(client, FakeBrowser(push_service.endpoint("limit-1")))
-        response = client.post("/api/v1/notifications/subscriptions",
+        response = client.post("/api/v1/notifications/subscriptions", headers=AUTH,
                                json={"subscription": FakeBrowser(push_service.endpoint("limit-2")).subscription})
     assert response.status_code == 503 and response.json()["error"] == "subscription_limit"
 
@@ -242,7 +248,7 @@ def test_committed_alert_reaches_the_push_service_with_a_minimal_encrypted_paylo
         subscription_id, token = register(client, browser)
         prediction = client.post("/api/v1/risk/predict", json=ELEVATED).json()
         wait_for(lambda: push_service.for_path("e2e"))
-        alert = client.get("/api/v1/alerts", params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
+        alert = client.get("/api/v1/alerts", headers=AUTH, params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
         wait_for(lambda: deliveries(subscription_id) and deliveries(subscription_id)[0]["status"] == "accepted")
         status = client.get(f"/api/v1/notifications/subscriptions/{subscription_id}", headers=owner(token)).json()
 
@@ -312,10 +318,28 @@ def test_preferences_filter_by_severity_and_enabled(database, vapid, push_servic
         critical_only, token = register(client, FakeBrowser(push_service.endpoint("critical-only")), min_severity="critical")
         paused, paused_token = register(client, FakeBrowser(push_service.endpoint("paused")))
         client.patch(f"/api/v1/notifications/subscriptions/{paused}", json={"enabled": False}, headers=owner(paused_token))
-    create_alert(patient_id="DEMO-P", event_key="pref:high", severity="high", title="t", details={})
-    create_alert(patient_id="DEMO-P", event_key="pref:critical", severity="critical", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="pref:high", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="pref:critical", severity="critical", title="t", details={})
     assert [d["alert_id"] is not None for d in deliveries(critical_only)] == [True]
     assert deliveries(paused) == []
+
+
+def test_alerts_reach_only_the_assigned_doctors_devices(database, vapid, push_service):
+    with TestClient(app) as client:
+        assert client.post("/api/v1/notifications/subscriptions",
+                           json={"subscription": FakeBrowser(push_service.endpoint("anon")).subscription}).status_code == 401
+        icu_doctor, _ = register(client, FakeBrowser(push_service.endpoint("icu-doctor")))
+        er_doctor, er_token = register(client, FakeBrowser(push_service.endpoint("er-doctor")), headers=auth_headers("dr.khan"))
+        admin, _ = register(client, FakeBrowser(push_service.endpoint("admin")), headers=AUTH)
+        status = client.get(f"/api/v1/notifications/subscriptions/{er_doctor}", headers=owner(er_token)).json()
+    assert status["subscription"]["username"] == "dr.khan"
+    # P-SIM-003 is in the ICU (doctor.demo); P-SIM-004 is in Emergency (dr.khan); DEMO-X is not in the cohort.
+    create_alert(patient_id="P-SIM-003", event_key="target:icu", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-004", event_key="target:er", severity="critical", title="t", details={})
+    create_alert(patient_id="DEMO-X", event_key="target:none", severity="critical", title="t", details={})
+    assert [d["event_key"] for d in deliveries(icu_doctor)] == ["alert:1:created"]
+    assert [d["event_key"] for d in deliveries(er_doctor)] == ["alert:2:created"]
+    assert deliveries(admin) == []
 
 
 # --- Deduplication, retries and cleanup -------------------------------------------------------
@@ -324,7 +348,7 @@ def test_duplicate_alerts_and_repeated_or_concurrent_workers_send_once(database,
     with TestClient(app) as client:
         register(client, FakeBrowser(push_service.endpoint("dedupe")))
     for _ in range(3):
-        create_alert(patient_id="DEMO-D", event_key="dedupe:1", severity="high", title="t", details={})
+        create_alert(patient_id="P-SIM-003", event_key="dedupe:1", severity="high", title="t", details={})
     assert len(deliveries()) == 1
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda _: service.process_due(), range(4)))
@@ -336,7 +360,7 @@ def test_transient_errors_are_retried_with_backoff_and_retry_after(database, vap
     push_service.scripts["/push/retry"] = [(500, {}), (429, {"Retry-After": "120"}), (201, {})]
     with TestClient(app) as client:
         register(client, FakeBrowser(push_service.endpoint("retry")))
-    create_alert(patient_id="DEMO-R", event_key="retry:1", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="retry:1", severity="high", title="t", details={})
     assert service.process_due() == ["retrying"]
     assert service.process_due() == []  # not due yet: backoff respected
     make_due()
@@ -357,7 +381,7 @@ def test_network_failures_retry_then_give_up_after_max_attempts(database, vapid,
         dead_port = sock.getsockname()[1]
     with TestClient(app) as client:
         register(client, FakeBrowser(f"http://127.0.0.1:{dead_port}/push/dead"))
-    create_alert(patient_id="DEMO-N", event_key="net:1", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="net:1", severity="high", title="t", details={})
     outcomes = []
     for _ in range(service.MAX_ATTEMPTS):
         make_due()
@@ -370,12 +394,12 @@ def test_gone_subscriptions_are_deactivated_and_pending_work_skipped(database, v
     push_service.scripts["/push/gone"] = [(410, {})]
     with TestClient(app) as client:
         subscription_id, token = register(client, FakeBrowser(push_service.endpoint("gone")))
-    create_alert(patient_id="DEMO-G", event_key="gone:1", severity="high", title="t", details={})
-    create_alert(patient_id="DEMO-G", event_key="gone:2", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="gone:1", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="gone:2", severity="high", title="t", details={})
     service.process_due(limit=1)
     statuses = [d["status"] for d in deliveries(subscription_id)]
     assert statuses == ["expired", "skipped"]
-    create_alert(patient_id="DEMO-G", event_key="gone:3", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="gone:3", severity="high", title="t", details={})
     assert len(deliveries(subscription_id)) == 2  # expired subscriptions get nothing new
     with get_engine().connect() as connection:
         assert connection.execute(select(push_subscriptions.c.status)).scalar() == "expired"
@@ -386,7 +410,7 @@ def test_permanent_client_errors_are_not_retried(database, vapid, push_service):
     push_service.scripts["/push/toolarge"] = [(413, {})]
     with TestClient(app) as client:
         register(client, FakeBrowser(push_service.endpoint("toolarge")))
-    create_alert(patient_id="DEMO-T", event_key="large:1", severity="high", title="t", details={})
+    create_alert(patient_id="P-SIM-003", event_key="large:1", severity="high", title="t", details={})
     assert service.process_due() == ["failed"]
     make_due()
     assert service.process_due() == []
@@ -415,7 +439,7 @@ def test_in_app_alerts_work_when_push_is_not_configured(database, monkeypatch):
         while (event := receiver.receive_json())["type"] != "alert.created":
             pass
         health = client.get("/health").json()
-        alerts = client.get("/api/v1/alerts").json()
+        alerts = client.get("/api/v1/alerts", headers=AUTH).json()
     assert alerts["count"] == 1 and event["alert"]["id"] == alerts["items"][0]["id"]
     assert health["components"]["web_push"]["configured"] is False and health["status"] == "ok"
     assert deliveries() == []

@@ -13,15 +13,18 @@ Transactional contract:
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Callable
+from sqlalchemy import select
 from sqlalchemy.engine import Connection
 from starlette.concurrency import run_in_threadpool
 from .alert_service import alert_created_event, insert_alert
 from .event_broker import events, record_event
 from .model import active_model, explain, predict_probability, risk_level
 from .schemas import RiskPrediction
-from .storage import get_engine, insert_observation
+from .storage import get_engine, insert_observation, list_stream_observations
+from .storage_schema import alerts as alerts_table
 
 ALERT_SCORE_THRESHOLD = 65
+_LEVEL_RANK = {"low": 0, "moderate": 1, "high": 2, "critical": 3}
 
 
 def score_observation(patient_id: str, values: dict[str, Any]) -> RiskPrediction:
@@ -70,6 +73,52 @@ def persist_observation(patient_id: str, values: dict[str, Any], result: RiskPre
             record_event(connection, "alert.created", alert_created_event(alert, saved["id"], session_id),
                          session_id=session_id, aggregate_id=alert["id"])
     return saved, alert, event
+
+
+def _unresolved_alert_rank(connection: Connection, patient_id: str) -> int:
+    """Highest severity rank among the patient's open or acknowledged alerts (0 if none)."""
+    severities = connection.execute(select(alerts_table.c.severity).where(
+        alerts_table.c.patient_id == patient_id, alerts_table.c.status != "resolved")).scalars().all()
+    return max((_LEVEL_RANK.get(severity, 0) for severity in severities), default=0)
+
+
+def persist_cohort_tick(session_id: str, sequence: int,
+                        items: list[tuple[str, dict[str, Any], RiskPrediction]], *,
+                        within: Callable[[Connection, list[dict[str, Any]]], None] | None = None,
+                        server_received_at: str | None = None) -> list[dict[str, Any]]:
+    """Write one stream sequence for every cohort patient, their alerts and outbox events atomically.
+
+    Alert rule (cohort streams): a patient raises an alert only when its risk level rises
+    into high or critical compared with its previous sequence, and it has no unresolved
+    alert of that severity or higher already. A deteriorated patient therefore alerts once
+    on reaching "high" and once more on escalating to "critical", not on every tick.
+    """
+    events: list[dict[str, Any]] = []
+    with get_engine().begin() as connection:
+        previous = {record["patient_id"]: record["prediction"]["risk_level"]
+                    for record in (list_stream_observations(session_id, sequence - 1, connection) if sequence else [])}
+        saved_rows = []
+        for patient_id, values, result in items:
+            saved = insert_observation(connection, patient_id, values, result.model_dump(),
+                                       session_id=session_id, sequence=sequence)
+            saved_rows.append(saved)
+            alert = None
+            rank = _LEVEL_RANK[result.risk_level]
+            rose = patient_id in previous and rank > _LEVEL_RANK.get(previous[patient_id], 0)
+            if rose and result.risk_score >= ALERT_SCORE_THRESHOLD and rank > _unresolved_alert_rank(connection, patient_id):
+                spec = _alert_for(patient_id, result, saved["id"], values)
+                if spec:
+                    alert = insert_alert(connection, **spec, emit_event=False)
+            event = record_event(connection, "observation.created",
+                                 observation_event(saved, alert, server_received_at=server_received_at),
+                                 session_id=session_id, aggregate_id=saved["id"])
+            events.append(event)
+            if alert:
+                record_event(connection, "alert.created", alert_created_event(alert, saved["id"], session_id),
+                             session_id=session_id, aggregate_id=alert["id"])
+        if within:
+            within(connection, saved_rows)
+    return events
 
 
 def alert_summary(alert: dict | None) -> dict | None:

@@ -10,6 +10,14 @@ export interface LiveAlertEvent {
   alert: { id: number; patient_id: string; title: string; severity: string; status: string; created_at: string };
   demo_only: true;
 }
+export interface LiveAlertUpdatedEvent {
+  type: 'alert.updated';
+  event_id: number;
+  action: 'acknowledge' | 'resolve';
+  actor: string;
+  alert: { id: number; patient_id: string; title: string; severity: string; status: string; created_at: string };
+  demo_only: true;
+}
 export interface StreamStateEvent {
   type: 'stream.state';
   action: 'started' | 'paused' | 'resumed' | 'stopped';
@@ -18,7 +26,7 @@ export interface StreamStateEvent {
 }
 export interface PongEvent { type: 'pong'; client_time?: number | null; server_time?: string }
 export type LiveEvent =
-  | LiveObservationEvent | LiveAlertEvent | StreamStateEvent | PongEvent
+  | LiveObservationEvent | LiveAlertEvent | LiveAlertUpdatedEvent | StreamStateEvent | PongEvent
   | { type: 'connected'; server_time?: string; demo_only?: true }
   | { type: 'error'; detail?: string };
 export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline';

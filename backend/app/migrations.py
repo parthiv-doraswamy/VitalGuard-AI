@@ -66,7 +66,7 @@ def _live_stream_sessions(connection: Connection) -> None:
     if "sequence" not in columns:
         connection.execute(text("ALTER TABLE observations ADD COLUMN sequence INTEGER"))
     stream_sessions.create(connection, checkfirst=True)
-    _create_indexes(connection, {"uq_observations_session_sequence", "idx_stream_sessions_status"})
+    _create_indexes(connection, {"idx_stream_sessions_status"})
 
 
 def _event_outbox(connection: Connection) -> None:
@@ -83,6 +83,21 @@ def _web_push(connection: Connection) -> None:
                                  "idx_push_deliveries_subscription"})
 
 
+def _cohort_streams_and_users(connection: Connection) -> None:
+    """v7: cohort stream mode, per-patient stream uniqueness, and user-bound push subscriptions."""
+    session_columns = {column["name"] for column in inspect(connection).get_columns("stream_sessions")}
+    if "mode" not in session_columns:
+        connection.execute(text("ALTER TABLE stream_sessions ADD COLUMN mode VARCHAR(16) NOT NULL DEFAULT 'patient'"))
+    push_columns = {column["name"] for column in inspect(connection).get_columns("push_subscriptions")}
+    if "username" not in push_columns:
+        connection.execute(text("ALTER TABLE push_subscriptions ADD COLUMN username VARCHAR(120)"))
+    if "role" not in push_columns:
+        connection.execute(text("ALTER TABLE push_subscriptions ADD COLUMN role VARCHAR(16)"))
+    # A cohort stream stores one row per patient for each sequence, so uniqueness now includes patient_id.
+    connection.execute(text("DROP INDEX IF EXISTS uq_observations_session_sequence"))
+    _create_indexes(connection, {"uq_observations_session_sequence_patient", "idx_push_subscriptions_username"})
+
+
 STEPS: tuple[tuple[int, str, Callable[[Connection], None]], ...] = (
     (1, "baseline_tables", _baseline_tables),
     (2, "history_indexes", _history_indexes),
@@ -90,6 +105,7 @@ STEPS: tuple[tuple[int, str, Callable[[Connection], None]], ...] = (
     (4, "live_stream_sessions", _live_stream_sessions),
     (5, "event_outbox", _event_outbox),
     (6, "web_push", _web_push),
+    (7, "cohort_streams_and_users", _cohort_streams_and_users),
 )
 LATEST_VERSION = STEPS[-1][0]
 

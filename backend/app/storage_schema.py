@@ -25,14 +25,19 @@ Index("idx_observations_patient_created", observations.c.patient_id,
       observations.c.created_at.desc(), observations.c.id.desc())
 # History pages are keyed by id (before_id cursor), so filter + order by id.
 Index("idx_observations_patient_id_desc", observations.c.patient_id, observations.c.id.desc())
-# One persisted observation per stream sequence number: retries cannot duplicate records.
-Index("uq_observations_session_sequence", observations.c.session_id, observations.c.sequence, unique=True)
+# One persisted observation per stream sequence number and patient: retries cannot duplicate
+# records. A single-patient stream writes one row per sequence; a cohort stream one per patient.
+Index("uq_observations_session_sequence_patient", observations.c.session_id, observations.c.sequence,
+      observations.c.patient_id, unique=True)
 
 stream_sessions = Table(
     "stream_sessions", metadata,
     Column("id", String(36), primary_key=True),
     Column("patient_id", String(64), nullable=False),
     Column("scenario", String(16), nullable=False),
+    # "patient": one fictional patient follows `scenario`. "cohort": every patient in
+    # data/cohort.json follows its own scenario, one observation each per sequence.
+    Column("mode", String(16), nullable=False, server_default="patient"),
     Column("status", String(16), nullable=False),
     Column("interval_ms", Integer, nullable=False),
     Column("next_sequence", Integer, nullable=False, server_default="0"),
@@ -130,7 +135,12 @@ push_subscriptions = Table(
     Column("last_failure_at", DateTime(timezone=True)),
     Column("consecutive_failures", Integer, nullable=False, server_default="0"),
     Column("expired_reason", String(80)),
+    # The signed-in demo user who registered this device. Alert pushes go only to the
+    # assigned doctor's devices; anonymous (NULL) subscriptions receive test pushes only.
+    Column("username", String(120)),
+    Column("role", String(16)),
 )
+Index("idx_push_subscriptions_username", push_subscriptions.c.username)
 Index("idx_push_subscriptions_status", push_subscriptions.c.status, push_subscriptions.c.enabled)
 
 # Durable delivery queue. Rows are created in the same transaction as the alert, so a

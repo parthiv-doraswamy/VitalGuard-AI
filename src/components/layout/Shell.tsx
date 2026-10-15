@@ -7,14 +7,19 @@ import { SimBar } from './SimBar.tsx';
 import { Toasts } from './Toasts.tsx';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
 import { ConnectionBanner, UpdatePrompt } from './PwaStatus.tsx';
+import { clearSession } from '../../services/auth.ts';
+import { disablePush, hasPushSubscription } from '../../services/notifications.ts';
 
 export function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const { status, eventCount, latest } = useLiveEvents();
   const navigate = useNavigate();
   const live = status === 'connected';
   function leaveDemo() {
-    sessionStorage.removeItem('vg-demo-session');
-    navigate('/login', { replace: true });
+    const finish = () => { clearSession(); navigate('/login', { replace: true }); };
+    if (!hasPushSubscription()) { finish(); return; }
+    // Stop this device receiving the signed-out user's alert pushes; never hold sign-out up for long.
+    const timeout = new Promise((resolve) => window.setTimeout(resolve, 3000));
+    void Promise.race([disablePush().catch(() => undefined), timeout]).finally(finish);
   }
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#f5f8fb] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -32,7 +37,7 @@ export function Shell({ title, subtitle, children }: { title: string; subtitle?:
             <strong>Backend live channel: {status}</strong>
             <span className="opacity-80">· {eventCount} live events received in this view</span>
             <span className="ml-auto text-[10px] uppercase tracking-wider font-bold">Synthetic demo only</span>
-            <button type="button" onClick={leaveDemo} className="touch-target inline-flex items-center gap-1.5 rounded-lg border border-current/20 px-2.5 py-1.5 font-semibold transition hover:bg-black/5" aria-label="Sign out of demo"><LogOut size={13} /> Exit demo</button>
+            <button type="button" onClick={leaveDemo} className="touch-target inline-flex items-center gap-1.5 rounded-lg border border-current/20 px-2.5 py-1.5 font-semibold transition hover:bg-black/5" aria-label="Sign out of demo"><LogOut size={13} /> Sign out</button>
           </div>
         </div>
         <div className="px-4 md:px-8 pt-2 max-w-[1440px] w-full mx-auto">

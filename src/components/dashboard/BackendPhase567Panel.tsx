@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, Clock3, RefreshCw, ShieldAlert } from 'lucide-react';
 import { APP_CONFIG } from '../../services/config.ts';
+import { authHeaders } from '../../services/auth.ts';
 
 type DemoAlert = {
   id: number; patient_id: string; severity: string; status: 'open' | 'acknowledged' | 'resolved';
@@ -23,7 +24,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${APP_CONFIG.apiBaseUrl}${path}`, {
     ...init,
     signal: AbortSignal.timeout(8000),
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...init?.headers },
   });
   if (!response.ok) {
     const message = await response.text().catch(() => '');

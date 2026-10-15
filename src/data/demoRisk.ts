@@ -1,15 +1,4 @@
-import type { RiskSignal, RiskFactor } from '../types/index.ts';
-import { tsAgo } from './demoPatients.ts';
-export const DEMO_RISK: Record<string, RiskSignal> = {
-  'P-SIM-001': { patientId: 'P-SIM-001', score: 12, level: 'low', probability: 0.12, news2: 1, trend: 'stable', trajectory: [10,11,12,11,12,12], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(4) },
-  'P-SIM-002': { patientId: 'P-SIM-002', score: 22, level: 'low', probability: 0.22, news2: 2, trend: 'stable', trajectory: [20,21,22,21,22,22], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(6) },
-  'P-SIM-003': { patientId: 'P-SIM-003', score: 87, level: 'high', probability: 0.87, news2: 7, trend: 'worsening', trajectory: [32,41,55,70,82,87], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(2) },
-  'P-SIM-004': { patientId: 'P-SIM-004', score: 34, level: 'moderate', probability: 0.34, news2: 3, trend: 'recovering', trajectory: [68,60,52,44,38,34], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(8) },
-  'P-SIM-005': { patientId: 'P-SIM-005', score: 9, level: 'low', probability: 0.09, news2: 0, trend: 'stable', trajectory: [9,9,10,9,9,9], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(11) },
-  'P-SIM-006': { patientId: 'P-SIM-006', score: 76, level: 'high', probability: 0.76, news2: 6, trend: 'worsening', trajectory: [30,42,54,63,71,76], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(3) },
-  'P-SIM-007': { patientId: 'P-SIM-007', score: 6, level: 'low', probability: 0.06, news2: 0, trend: 'stable', trajectory: [6,6,6,7,6,6], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(14) },
-  'P-SIM-008': { patientId: 'P-SIM-008', score: 28, level: 'moderate', probability: 0.28, news2: 2, trend: 'recovering', trajectory: [62,55,47,39,32,28], trajectoryLabels: ['2h ago','1.5h ago','1h ago','30m ago','Now','Live'], updatedAt: tsAgo(9) },
-};
+import type { RiskFactor } from '../types/index.ts';
 export const DEMO_FACTORS: Record<string, RiskFactor[]> = {
   'P-SIM-003': [
     { patientId: 'P-SIM-003', name: 'SpO2 decline', contribution: 0.32, direction: 'increases-risk', currentValue: '92%', trend: '98% to 92% in simulated window', description: 'Sustained downward SpO2 trend in demo data.' },

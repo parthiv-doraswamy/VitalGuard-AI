@@ -5,7 +5,9 @@ import { Shell } from '../components/layout/Shell.tsx';
 import { PageHeader, SectionCard } from '../components/ui/Primitives.tsx';
 import { LiveStatusPanel } from '../components/live/LiveStatusPanel.tsx';
 import { LiveEventLog } from '../components/live/LiveEventLog.tsx';
-import { liveDemoApi, type LiveDemoConfig, type StreamScenario } from '../services/api.ts';
+import { liveDemoApi, type LiveDemoConfig, type StreamMode, type StreamScenario } from '../services/api.ts';
+import { WardBoard } from '../components/live/WardBoard.tsx';
+import { useScope } from '../store/useScope.ts';
 import { useLiveEvents } from '../services/useLiveEvents.ts';
 import { useOnlineStatus } from '../services/pwa.ts';
 import type { StreamProducer } from '../services/streamProducer.ts';
@@ -20,6 +22,7 @@ const INTERVALS = [1000, 2000, 3000, 5000];
 function ProducerControls({ producer }: { producer: StreamProducer }) {
   const { state } = producer;
   const online = useOnlineStatus();
+  const [mode, setMode] = useState<StreamMode>('cohort');
   const [scenario, setScenario] = useState<StreamScenario>('worsening');
   const [intervalMs, setIntervalMs] = useState(2000);
   const [producerKey, setProducerKey] = useState('');
@@ -33,19 +36,27 @@ function ProducerControls({ producer }: { producer: StreamProducer }) {
   const busy = state.phase === 'starting';
   const active = state.phase === 'running' || state.phase === 'paused';
   const ack = state.lastAck;
-  const begin = (takeover = false) => producer.start({ scenario, intervalMs, producerKey: producerKey || undefined, takeover });
+  const begin = (takeover = false) => producer.start({ mode, scenario, intervalMs, producerKey: producerKey || undefined, takeover });
 
   return (
     <SectionCard eyebrow="Laptop A" title="Producer controls" label="Producer controls"
       hint="The backend generates, scores and stores each fictional observation; this browser only requests the next one.">
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 flex flex-col gap-1">
+          Stream
+          <select aria-label="Stream mode" value={mode} disabled={active || busy} onChange={(event) => setMode(event.target.value as StreamMode)}
+            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] normal-case font-semibold text-slate-700">
+            <option value="cohort">All existing patients</option>
+            <option value="patient">One new fictional patient</option>
+          </select>
+        </label>
+        {mode === 'patient' && <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 flex flex-col gap-1">
           Scenario
           <select aria-label="Stream scenario" value={scenario} disabled={active || busy} onChange={(event) => setScenario(event.target.value as StreamScenario)}
             className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] normal-case font-semibold text-slate-700">
             {SCENARIOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
-        </label>
+        </label>}
         <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 flex flex-col gap-1">
           Interval
           <select aria-label="Stream interval" value={intervalMs} disabled={active || busy} onChange={(event) => setIntervalMs(Number(event.target.value))}
@@ -100,11 +111,12 @@ export function LiveDemoPage() {
   const [params, setParams] = useSearchParams();
   const role = params.get('role') === 'receiver' ? 'receiver' : 'producer';
   const { producer } = useLiveEvents();
+  const { patients } = useScope();
 
   return (
-    <Shell title="Live Streaming Demo" subtitle="Two-device synchronized backend stream · fictional data">
+    <Shell title="Live Streaming Demo" subtitle="Live vitals for every existing patient · fictional data">
       <PageHeader eyebrow="Synchronized demo" title="Live Streaming Demo"
-        subtitle="Laptop A produces a backend stream; Laptop B watches it arrive on the normal dashboard. Every value is fictional."
+        subtitle={`Start the stream and the backend updates all ${patients.length} existing patients each tick: vitals, charts, risk scores and alerts change live on every signed-in device, and each patient's doctor is notified. Every value is fictional.`}
         crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Live demo' }]}
         actions={(
           <div className="inline-flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50" role="group" aria-label="Device role">
@@ -124,11 +136,14 @@ export function LiveDemoPage() {
           </p>
         )}
         <LiveStatusPanel />
+        <SectionCard eyebrow="Ward board" title="Live patient vitals" hint="Highest risk first · select a patient to open their charts" label="Live ward board">
+          <WardBoard />
+        </SectionCard>
         <SectionCard eyebrow="Event log" title="Committed backend events" hint="Unique by event ID · identical on every connected device" label="Live event log">
           <LiveEventLog />
         </SectionCard>
         <p className="text-[11px] text-slate-400">
-          The Start simulation bar above is a separate local simulation that runs only in this browser and is not shared with other devices.
+          The Live monitoring bar above starts the same cohort stream. Without a backend connection it falls back to a local simulation that only this browser sees.
         </p>
       </div>
     </Shell>

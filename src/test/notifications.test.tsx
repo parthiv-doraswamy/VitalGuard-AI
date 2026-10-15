@@ -223,7 +223,7 @@ describe('notification UI', () => {
   it('explains a denied permission without blocking anything', async () => {
     installPushApis({ permission: 'denied' });
     mockApi();
-    render(<MemoryRouter><NotificationSettings /></MemoryRouter>);
+    render(<SimulationProvider><MemoryRouter><NotificationSettings /></MemoryRouter></SimulationProvider>);
     expect(await screen.findByText(/Notifications are blocked for this site/)).toBeInTheDocument();
     expect(screen.getByText(/In-app alerts still work/)).toBeInTheDocument();
   });
@@ -231,7 +231,7 @@ describe('notification UI', () => {
   it('enables notifications only after an explicit click', async () => {
     const { NotificationMock } = installPushApis();
     mockApi();
-    render(<MemoryRouter><NotificationSettings /></MemoryRouter>);
+    render(<SimulationProvider><MemoryRouter><NotificationSettings /></MemoryRouter></SimulationProvider>);
     const button = await screen.findByRole('button', { name: /Enable notifications on this device/ });
     expect(NotificationMock.requestPermission).not.toHaveBeenCalled();
     fireEvent.click(button);

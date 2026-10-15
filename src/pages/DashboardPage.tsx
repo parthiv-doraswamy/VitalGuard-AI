@@ -14,24 +14,28 @@ import { LiveStatusPanel } from '../components/live/LiveStatusPanel.tsx';
 import { BackendPhase567Panel } from '../components/dashboard/BackendPhase567Panel.tsx';
 import { RISK_BANDS } from '../theme/tokens.ts';
 import { useSimulation } from '../store/useSimulation.ts';
+import { useScope } from '../store/useScope.ts';
 
 export function DashboardPage() {
-  const { patients, risks, latest, alerts, tick, running } = useSimulation();
+  const { risks, latest, tick, running } = useSimulation();
+  const { patients, alerts, scope } = useScope();
   const [filters, setFilters] = useFilterState();
   const filtered = useMemo(() => filterCohort(patients, risks, filters), [patients, risks, filters]);
   const dist = useMemo(() => {
-    const v = Object.values(risks);
+    const v = patients.map((p) => risks[p.id]).filter(Boolean);
     return [
       { name: 'Critical', value: v.filter((r) => r.level === 'critical').length },
       { name: 'High', value: v.filter((r) => r.level === 'high').length },
       { name: 'Moderate', value: v.filter((r) => r.level === 'moderate').length },
       { name: 'Low', value: v.filter((r) => r.level === 'low').length },
     ];
-  }, [risks]);
+  }, [patients, risks]);
   const openAlerts = alerts.filter((a) => a.status === 'open').length;
-  const hero = risks['P-SIM-003'];
-  const heroVitals = latest['P-SIM-003'];
-  const heroPatient = patients.find((p) => p.id === 'P-SIM-003');
+  // The highest-risk patient this user can see is the one to review first.
+  const heroPatient = patients.reduce<typeof patients[number] | undefined>(
+    (best, p) => (!best || (risks[p.id]?.score ?? 0) > (risks[best.id]?.score ?? 0) ? p : best), undefined);
+  const hero = heroPatient ? risks[heroPatient.id] : undefined;
+  const heroVitals = heroPatient ? latest[heroPatient.id] : undefined;
   return (
     <Shell title="Command Center" subtitle="Real-time clinical intelligence overview">
       <section className="clinical-panel relative overflow-hidden rounded-[24px] p-6 sm:p-8 lg:p-9" aria-label="Clinical intelligence overview">
@@ -46,9 +50,9 @@ export function DashboardPage() {
             SIMULATED CLINICAL WORKSPACE · t+{tick}
           </p>
           <h2 className="font-display text-[32px] sm:text-[40px] leading-[1.06] font-extrabold tracking-tight mt-2 text-slate-900 dark:text-slate-50">See the signals.<br className="hidden sm:block" /> Prioritise the review.</h2>
-          <p className="text-sm sm:text-[15px] clinical-muted mt-3 leading-relaxed max-w-xl">A unified view of {patients.length} synthetic patient profiles, changing vital-sign scenarios, risk signals and review priorities. For demonstration and evaluation only.</p>
+          <p className="text-sm sm:text-[15px] clinical-muted mt-3 leading-relaxed max-w-xl">A unified view of {patients.length} {scope === 'assigned' ? 'assigned ' : ''}synthetic patient profiles, changing vital-sign scenarios, risk signals and review priorities. For demonstration and evaluation only.</p>
           <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            <Link to="/patients/P-SIM-003" className="btn-primary">Review priority patient <ArrowUpRight size={15} aria-hidden /></Link>
+            <Link to={`/patients/${heroPatient?.id ?? ''}`} className="btn-primary">Review priority patient <ArrowUpRight size={15} aria-hidden /></Link>
             <Link to="/alerts" className="btn-secondary">Open alert center <span className="inline-grid min-w-5 h-5 px-1 place-items-center rounded-md bg-slate-100 text-slate-700 text-[11px]">{openAlerts}</span></Link>
           </div>
         </div>

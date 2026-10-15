@@ -13,6 +13,9 @@ from app.alert_service import create_alert, list_alert_audit, transition_alert
 from app.main import app
 from app.storage import StorageConfigurationError, dispose_engines, get_engine, initialize_storage, save_observation
 from app.storage_schema import alerts, audit_events, observations
+from conftest import auth_headers
+
+AUTH = auth_headers()
 
 ELEVATED = {"patient_id": "DEMO-PERSIST-001", "age": 70, "heart_rate": 180, "spo2": 78, "systolic_bp": 80,
             "diastolic_bp": 50, "temperature": 39.5, "respiratory_rate": 34}
@@ -28,16 +31,16 @@ def _count(table) -> int:
 def test_observation_alert_and_audit_survive_application_restart(database):
     with TestClient(app) as client:
         prediction = client.post("/api/v1/risk/predict", json=ELEVATED).json()
-        alert = client.get("/api/v1/alerts", params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
-        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", json={"actor": "demo-nurse"})
-        resolved = client.post(f"/api/v1/alerts/{alert['id']}/resolve", json={"actor": "demo-nurse"}).json()["item"]
+        alert = client.get("/api/v1/alerts", headers=AUTH, params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
+        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})
+        resolved = client.post(f"/api/v1/alerts/{alert['id']}/resolve", headers=AUTH, json={"actor": "demo-nurse"}).json()["item"]
     # Leaving the client runs shutdown, which disposes every pooled connection,
     # so the second app lifecycle reads only what the database itself kept.
     dispose_engines()
     with TestClient(app) as client:
         history = client.get("/api/v1/observations", params={"patient_id": ELEVATED["patient_id"]}).json()
-        after = client.get("/api/v1/alerts", params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
-        audit = client.get(f"/api/v1/alerts/{alert['id']}/audit").json()
+        after = client.get("/api/v1/alerts", headers=AUTH, params={"patient_id": ELEVATED["patient_id"]}).json()["items"][0]
+        audit = client.get(f"/api/v1/alerts/{alert['id']}/audit", headers=AUTH).json()
         health = client.get("/health").json()
     assert [item["id"] for item in history["items"]] == [prediction["observation_id"]]
     assert history["items"][0]["inputs"]["spo2"] == 78
@@ -78,7 +81,7 @@ def test_lost_database_connection_returns_503_without_events_or_secrets(database
             websocket.send_text("ping")
             assert websocket.receive_json() == {"type": "pong"}
         read = client.get("/api/v1/observations")
-        alert_list = client.get("/api/v1/alerts")
+        alert_list = client.get("/api/v1/alerts", headers=AUTH)
         health = client.get("/health")
     for response in (write, simulated, read, alert_list):
         assert response.status_code == 503
@@ -146,10 +149,10 @@ def test_alert_list_is_cursor_paginated(database):
     with TestClient(app) as client:
         ids = [create_alert(patient_id="DEMO-PAGE", event_key=f"page:{index}", severity="high",
                             title="Synthetic", details={"demo_only": True})["id"] for index in range(5)]
-        first = client.get("/api/v1/alerts", params={"limit": 2}).json()
-        second = client.get("/api/v1/alerts", params={"limit": 2, "before_id": first["next_before_id"]}).json()
-        last = client.get("/api/v1/alerts", params={"limit": 2, "before_id": second["next_before_id"]}).json()
-        too_large = client.get("/api/v1/alerts", params={"limit": 101})
+        first = client.get("/api/v1/alerts", headers=AUTH, params={"limit": 2}).json()
+        second = client.get("/api/v1/alerts", headers=AUTH, params={"limit": 2, "before_id": first["next_before_id"]}).json()
+        last = client.get("/api/v1/alerts", headers=AUTH, params={"limit": 2, "before_id": second["next_before_id"]}).json()
+        too_large = client.get("/api/v1/alerts", headers=AUTH, params={"limit": 101})
     assert [item["id"] for item in first["items"] + second["items"] + last["items"]] == sorted(ids, reverse=True)
     assert last["next_before_id"] is None
     assert too_large.status_code == 422
@@ -161,8 +164,8 @@ def test_audit_endpoint_finds_alerts_beyond_the_first_hundred(database):
                              title="Synthetic", details={})
         for index in range(1, 105):
             create_alert(patient_id="DEMO-MANY", event_key=f"many:{index}", severity="high", title="Synthetic", details={})
-        response = client.get(f"/api/v1/alerts/{first['id']}/audit")
-        missing = client.get("/api/v1/alerts/999999/audit")
+        response = client.get(f"/api/v1/alerts/{first['id']}/audit", headers=AUTH)
+        missing = client.get("/api/v1/alerts/999999/audit", headers=AUTH)
     assert response.status_code == 200 and response.json()["count"] == 1
     assert missing.status_code == 404
 

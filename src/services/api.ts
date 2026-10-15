@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.ts';
+import { authHeaders, handleUnauthorized } from './auth.ts';
 
 export interface RiskPredictionInput {
   patient_id: string;
@@ -40,13 +41,14 @@ export interface ObservationHistory {
   disclaimer: string;
 }
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
+  const headers = new Headers({ ...authHeaders(), ...Object.fromEntries(new Headers(init?.headers)) });
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(`${APP_CONFIG.apiBaseUrl}${path}`, {
     ...init,
     signal: AbortSignal.timeout(8000),
     headers,
   });
+  if (res.status === 401) handleUnauthorized();
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new Error(detail || `API request failed (${res.status})`);
@@ -75,12 +77,16 @@ export const api = {
 // --- Synchronized live-demo streaming (backend sessions; synthetic data only) ---
 
 export type StreamScenario = 'stable' | 'worsening' | 'recovering';
+/** "cohort" drives every existing demo patient along its own scenario; "patient" streams one fictional patient. */
+export type StreamMode = 'cohort' | 'patient';
 export type StreamStatus = 'running' | 'paused' | 'stopped';
 
 export interface StreamSession {
   session_id: string;
   patient_id: string;
-  scenario: StreamScenario;
+  scenario: StreamScenario | 'mixed';
+  mode?: StreamMode;
+  patient_count?: number;
   status: StreamStatus;
   interval_ms: number;
   next_sequence: number;
@@ -141,7 +147,7 @@ export class ApiError extends Error {
 
 async function liveRequest<T>(path: string, init: RequestInit & { json?: unknown; timeoutMs?: number } = {}): Promise<T> {
   const { json, timeoutMs = 8000, ...rest } = init;
-  const headers = new Headers(rest.headers);
+  const headers = new Headers({ ...authHeaders(), ...Object.fromEntries(new Headers(rest.headers)) });
   // Only JSON bodies need Content-Type; GETs stay "simple" and skip the CORS preflight.
   if (json !== undefined) headers.set('Content-Type', 'application/json');
   let response: Response;
@@ -152,6 +158,7 @@ async function liveRequest<T>(path: string, init: RequestInit & { json?: unknown
   } catch (error) {
     throw new ApiError(0, {}, error instanceof Error && error.name === 'TimeoutError' ? 'Request timed out' : 'Network unavailable');
   }
+  if (response.status === 401) handleUnauthorized();
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
     throw new ApiError(response.status, body, `API request failed (${response.status})`);
@@ -165,7 +172,7 @@ export const liveDemoApi = {
   config: () => liveRequest<LiveDemoConfig>('/api/v1/live-demo/config'),
   currentSession: () => liveRequest<{ session: StreamSession | null }>('/api/v1/live-demo/sessions/current'),
   getSession: (sessionId: string) => liveRequest<{ session: StreamSession }>(`/api/v1/live-demo/sessions/${encodeURIComponent(sessionId)}`),
-  start: (body: { scenario: StreamScenario; interval_ms: number; takeover?: boolean }, producerKey?: string) =>
+  start: (body: { scenario: StreamScenario; interval_ms: number; takeover?: boolean; mode?: StreamMode }, producerKey?: string) =>
     liveRequest<{ session: StreamSession; producer_token: string; replaced_session: StreamSession | null }>('/api/v1/live-demo/sessions', {
       method: 'POST', json: body, headers: producerKey ? { 'X-Demo-Producer-Key': producerKey } : undefined,
     }),
@@ -174,7 +181,7 @@ export const liveDemoApi = {
       method: 'POST', headers: producerHeaders(token),
     }),
   emit: (sessionId: string, token: string, sequence: number) =>
-    liveRequest<{ event: ObservationEvent; duplicate: boolean }>(`/api/v1/live-demo/sessions/${encodeURIComponent(sessionId)}/observations`, {
+    liveRequest<{ event: ObservationEvent; events?: ObservationEvent[]; duplicate: boolean }>(`/api/v1/live-demo/sessions/${encodeURIComponent(sessionId)}/observations`, {
       method: 'POST', json: { sequence }, headers: producerHeaders(token),
     }),
   /** Committed events after `afterId`, oldest first, in the same contract as the WebSocket. */

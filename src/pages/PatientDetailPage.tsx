@@ -7,6 +7,7 @@ import { VitalCard } from '../components/patients/VitalCard.tsx';
 import { DetailHeader, riskDelta, vitalCards } from '../components/patients/DetailModels.tsx';
 import { RiskPanel, News2Panel } from '../components/risk/RiskPanels.tsx';
 import { useSimulation } from '../store/useSimulation.ts';
+import { useScope } from '../store/useScope.ts';
 import { TrajCard } from './TrajCard.tsx';
 import { ExplainCard, VitalCharts, AlertList } from './DetailSections.tsx';
 import { BackendPatientTimeline } from '../components/patients/BackendPatientTimeline.tsx';
@@ -20,7 +21,16 @@ export function fmtAgo(iso: string): string {
 export function PatientDetailPage() {
   const { patientId = '' } = useParams();
   const { patients, latest, risks, histories } = useSimulation();
+  const { canSee } = useScope();
   const patient = patients.find((p) => p.id === patientId);
+  if (patient && !canSee(patient.id)) {
+    return (
+      <Shell title="Not your patient" subtitle="Access limited by role">
+        <EmptyState title={`${patient.id} is not assigned to you.`} hint="Doctors can open only their assigned patients."
+          action={<Link to="/patients" className="btn-primary">My patients</Link>} />
+      </Shell>
+    );
+  }
   if (!patient) {
     return (
       <Shell title="Patient not found" subtitle="Directory">

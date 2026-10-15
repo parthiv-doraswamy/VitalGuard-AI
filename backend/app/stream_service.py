@@ -18,6 +18,12 @@ Guarantees:
   or broadcast.
 - Optional start permission: when VITALGUARD_STREAM_PRODUCER_KEY is set, starting
   a stream requires the X-Demo-Producer-Key header to match it.
+
+Modes:
+- "patient": one fictional patient follows the chosen scenario (original demo).
+- "cohort": every patient in data/cohort.json follows its own scenario, so the
+  existing patients' vitals, charts and alerts change live. Each sequence writes
+  one observation per patient in a single transaction.
 """
 from __future__ import annotations
 import hashlib
@@ -33,10 +39,11 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 from .alert_service import list_alerts_by_event_keys
+from .cohort import cohort_vitals, patients as cohort_patients
 from .event_broker import event_for, record_event
-from .observation_service import observation_event, persist_observation, score_observation
+from .observation_service import observation_event, persist_cohort_tick, persist_observation, score_observation
 from .simulator import observation_for_step
-from .storage import get_engine, get_stream_observation, list_observations
+from .storage import get_engine, list_observations, list_stream_observations
 from .storage_schema import stream_sessions
 
 MAX_SEQUENCE = 1000
@@ -88,7 +95,9 @@ def _iso(value: datetime | None) -> str | None:
 
 def public_session(row: Any) -> dict[str, Any]:
     """Session view safe to show any viewer: never includes the token hash."""
+    mode = row.get("mode") or "patient"
     return {"session_id": row["id"], "patient_id": row["patient_id"], "scenario": row["scenario"],
+            "mode": mode, "patient_count": len(cohort_patients()) if mode == "cohort" else 1,
             "status": row["status"], "interval_ms": row["interval_ms"], "next_sequence": row["next_sequence"],
             "events_emitted": row["next_sequence"], "last_observation_id": row["last_observation_id"],
             "created_at": _iso(row["created_at"]), "updated_at": _iso(row["updated_at"]),
@@ -149,7 +158,7 @@ def get_session(session_id: str) -> dict[str, Any]:
 
 
 def start_session(*, scenario: str, patient_id: str | None, interval_ms: int, takeover: bool,
-                  producer_key: str | None) -> tuple[dict[str, Any], str, dict[str, Any] | None]:
+                  producer_key: str | None, mode: str = "patient") -> tuple[dict[str, Any], str, dict[str, Any] | None]:
     """Create the single active session; returns (session, producer_token, replaced_session)."""
     _check_producer_key(producer_key)
     session_id = str(uuid.uuid4())
@@ -168,8 +177,9 @@ def start_session(*, scenario: str, patient_id: str | None, interval_ms: int, ta
                 _stop(connection, active["id"], "idle_timeout" if idle and not takeover else "takeover")
                 replaced = public_session(_load(connection, active["id"]))
             connection.execute(insert(stream_sessions).values(
-                id=session_id, patient_id=patient_id or f"DEMO-STREAM-{session_id[:6].upper()}",
-                scenario=scenario, status="running", interval_ms=interval_ms, next_sequence=0,
+                id=session_id, mode=mode,
+                patient_id="COHORT" if mode == "cohort" else patient_id or f"DEMO-STREAM-{session_id[:6].upper()}",
+                scenario="mixed" if mode == "cohort" else scenario, status="running", interval_ms=interval_ms, next_sequence=0,
                 token_hash=_hash(token), active_slot=1, created_at=now, updated_at=now))
             _state_event(connection, session_id, "started")
             session = public_session(_load(connection, session_id))
@@ -200,12 +210,12 @@ def control_session(session_id: str, token: str | None, action: str) -> tuple[di
         return public_session(_load(connection, session_id)), changed
 
 
-def _existing_event(session_id: str, sequence: int) -> dict[str, Any] | None:
-    """The original committed event for a sequence (same event_seq/event_uuid the receivers got)."""
-    record = get_stream_observation(session_id, sequence)
-    if not record:
-        return None
-    return event_for("observation.created", record["id"]) or events_for_records([record])[0]
+def _existing_events(session_id: str, sequence: int) -> list[dict[str, Any]]:
+    """The original committed events for a sequence (same event_seq/event_uuid the receivers got)."""
+    events = []
+    for record in list_stream_observations(session_id, sequence):
+        events.append(event_for("observation.created", record["id"]) or events_for_records([record])[0])
+    return events
 
 
 class _SequenceConflict(Exception):
@@ -217,13 +227,13 @@ _last_emit_lock = threading.Lock()
 
 
 def emit_observation(session_id: str, token: str | None, sequence: int,
-                     server_received_at: str) -> tuple[dict[str, Any], bool]:
-    """Persist the observation for `sequence` with its outbox events. Returns (event, duplicate)."""
+                     server_received_at: str) -> tuple[list[dict[str, Any]], bool]:
+    """Persist the observation(s) for `sequence` with their outbox events. Returns (events, duplicate)."""
     with get_engine().connect() as connection:
         row = _load(connection, session_id)
     _authorize(row, token)
     if sequence < row["next_sequence"]:
-        existing = _existing_event(session_id, sequence)
+        existing = _existing_events(session_id, sequence)
         if existing:
             return existing, True
     if row["status"] != "running":
@@ -246,28 +256,37 @@ def emit_observation(session_id: str, token: str | None, sequence: int,
             raise StreamError(429, "emitting_too_fast", "Observations are being submitted too quickly.")
         _last_emit[session_id] = now
 
-    values = observation_for_step(row["scenario"], sequence)
-    result = score_observation(row["patient_id"], values)
-
-    def advance(connection: Connection, saved: dict[str, Any]) -> None:
+    def advance(connection: Connection, last_observation_id: int) -> None:
         moved = connection.execute(update(stream_sessions).where(stream_sessions.c.id == session_id,
             stream_sessions.c.status == "running", stream_sessions.c.next_sequence == sequence).values(
-            next_sequence=sequence + 1, last_observation_id=saved["id"], last_emit_at=_now(),
+            next_sequence=sequence + 1, last_observation_id=last_observation_id, last_emit_at=_now(),
             updated_at=_now())).rowcount
         if moved != 1:
             raise _SequenceConflict()
 
     try:
-        _saved, _alert, event = persist_observation(row["patient_id"], values, result, True, session_id=session_id,
-                                                    sequence=sequence, within=advance, server_received_at=server_received_at)
+        if (row.get("mode") or "patient") == "cohort":
+            items = []
+            for patient in cohort_patients():
+                values = cohort_vitals(patient, sequence)
+                items.append((patient["id"], values, score_observation(patient["id"], values)))
+            events = persist_cohort_tick(session_id, sequence, items, server_received_at=server_received_at,
+                                         within=lambda connection, saved: advance(connection, saved[-1]["id"]))
+        else:
+            values = observation_for_step(row["scenario"], sequence)
+            result = score_observation(row["patient_id"], values)
+            _saved, _alert, event = persist_observation(
+                row["patient_id"], values, result, True, session_id=session_id, sequence=sequence,
+                within=lambda connection, saved: advance(connection, saved["id"]), server_received_at=server_received_at)
+            events = [event]
     except (IntegrityError, _SequenceConflict):
         # A concurrent duplicate committed first, or the session was paused/stopped meanwhile.
-        existing = _existing_event(session_id, sequence)
+        existing = _existing_events(session_id, sequence)
         if existing:
             return existing, True
         raise StreamError(409, "session_changed", "The stream session changed state; nothing was saved.",
                           session=get_session(session_id))
-    return event, False
+    return events, False
 
 
 def events_for_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

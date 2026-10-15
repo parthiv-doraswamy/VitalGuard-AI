@@ -6,9 +6,11 @@ import { MiniBars } from '../components/charts/Vitals.tsx';
 import { RiskTrajectoryChart } from '../components/charts/Trajectory.tsx';
 import { Sparkline } from '../components/ui/premium.tsx';
 import { useSimulation } from '../store/useSimulation.ts';
+import { useScope } from '../store/useScope.ts';
 export function AnalyticsPage() {
-  const { patients, risks, alerts } = useSimulation();
-  const vals = Object.values(risks);
+  const { risks } = useSimulation();
+  const { patients, alerts } = useScope();
+  const vals = patients.map((p) => risks[p.id]).filter(Boolean);
   const dist = [
     { name: 'Critical', value: vals.filter((r) => r.level === 'critical').length },
     { name: 'High', value: vals.filter((r) => r.level === 'high').length },

@@ -1,23 +1,25 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Activity, ArrowRight, HeartPulse, ShieldCheck, Stethoscope, UserRound, Users } from 'lucide-react';
+import { DEMO_PASSWORD, ROLE_SUMMARY, STAFF, SignInError, signIn, type Role } from '../services/auth.ts';
 
-type DemoRole = 'admin' | 'nurse' | 'doctor';
-type RoleOption = { id: DemoRole; title: string; username: string; description: string; icon: typeof ShieldCheck };
+type RoleOption = { id: Role; title: string; username: string; description: string; icon: typeof ShieldCheck };
 
-const DEMO_PASSWORD = 'demo-access';
 const ROLES: RoleOption[] = [
-  { id: 'admin', title: 'Admin', username: 'admin.demo', description: 'Explore system overview and settings', icon: ShieldCheck },
-  { id: 'nurse', title: 'Nurse', username: 'nurse.demo', description: 'Explore patient monitoring and alerts', icon: HeartPulse },
-  { id: 'doctor', title: 'Doctor', username: 'doctor.demo', description: 'Explore patient profiles and risk signals', icon: Stethoscope },
+  { id: 'admin', title: 'Admin', username: 'admin.demo', description: 'Everything, incl. stream control and model performance', icon: ShieldCheck },
+  { id: 'nurse', title: 'Nurse', username: 'nurse.demo', description: 'All wards: monitoring, live stream and alerts', icon: HeartPulse },
+  { id: 'doctor', title: 'Doctor', username: 'doctor.demo', description: 'Only assigned patients, with alert notifications', icon: Stethoscope },
 ];
+const DOCTORS = STAFF.filter((member) => member.role === 'doctor');
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState<DemoRole>('admin');
+  const location = useLocation();
+  const [selectedRole, setSelectedRole] = useState<Role>('admin');
   const [username, setUsername] = useState('admin.demo');
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   function chooseRole(role: RoleOption) {
     setSelectedRole(role.id);
@@ -26,16 +28,23 @@ export function LoginPage() {
     setError('');
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const role = ROLES.find((item) => item.id === selectedRole);
-    if (!role || username !== role.username || password !== DEMO_PASSWORD) {
+    const member = STAFF.find((item) => item.username === username.trim().toLowerCase());
+    if (!member || member.role !== selectedRole) {
       setError('Choose a demo role below to fill in the demo credentials.');
       return;
     }
-    // This is a UI-only demo persona selector, not server authentication or authorization.
-    sessionStorage.setItem('vg-demo-session', JSON.stringify({ role: role.id, username: role.username }));
-    navigate('/dashboard', { replace: true });
+    setBusy(true);
+    try {
+      await signIn(member.username, password);
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from && from !== '/login' ? from : '/dashboard', { replace: true });
+    } catch (caught) {
+      setError(caught instanceof SignInError ? caught.message : 'Sign-in failed. Try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -102,9 +111,20 @@ export function LoginPage() {
                 <label htmlFor="demo-password" className="mb-1.5 block text-xs font-semibold text-slate-600">Demo password</label>
                 <input id="demo-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="field w-full" />
               </div>
+              {selectedRole === 'doctor' && (
+                <div>
+                  <label htmlFor="demo-doctor" className="mb-1.5 block text-xs font-semibold text-slate-600">Doctor account</label>
+                  <select id="demo-doctor" value={username} onChange={(event) => setUsername(event.target.value)} className="field w-full">
+                    {DOCTORS.map((doctor) => <option key={doctor.username} value={doctor.username}>{doctor.display_name} · {doctor.wards.join(', ')}</option>)}
+                  </select>
+                </div>
+              )}
+              <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600" data-testid="role-access">
+                <span className="font-semibold capitalize">{selectedRole} access:</span> {ROLE_SUMMARY[selectedRole]}
+              </p>
               {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
-              <button type="submit" className="btn-primary w-full !py-3">Open demo workspace <ArrowRight size={16} /></button>
-              <p className="text-center text-[11px] leading-5 text-slate-400">Demo shortcut only. These personas do not provide real authentication or role-based permissions.</p>
+              <button type="submit" className="btn-primary w-full !py-3" disabled={busy}>Open demo workspace <ArrowRight size={16} /></button>
+              <p className="text-center text-[11px] leading-5 text-slate-400">Demo accounts with a shared demo password. The backend checks the role on every protected request.</p>
             </form>
             <p className="mt-5 text-center text-xs leading-5 text-slate-400">Synthetic demonstration data only. Not clinically validated and not for real patient care.</p>
           </div>
