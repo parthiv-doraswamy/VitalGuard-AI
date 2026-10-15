@@ -1,0 +1,29 @@
+{
+  "name": "VitalGuard AI",
+  "short_name": "VitalGuard",
+  "description": "Clinical intelligence and safety signal dashboard demo.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f8fb",
+  "theme_color": "#0f766e",
+  "categories": [
+    "medical",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icons/vitalguard-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/vitalguard-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
