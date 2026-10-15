@@ -4,7 +4,7 @@ import { BellRing, Download, Smartphone, ShieldCheck } from 'lucide-react';
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
 
 export function PwaNotificationSettings() {
-  const [permission, setPermission] = useState<NotificationPermission>(() =>
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     'Notification' in window ? Notification.permission : 'unsupported'
   );
   const [installed, setInstalled] = useState(false);
