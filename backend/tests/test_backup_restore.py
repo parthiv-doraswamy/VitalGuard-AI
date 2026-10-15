@@ -5,6 +5,9 @@ from app.db_tools import RestoreRefused, _build_engine, export_snapshot, main, r
 from app.main import app
 from app.storage import get_engine
 from conftest import POSTGRES_TEST_URL, reset_postgres_schema
+from conftest import auth_headers
+
+AUTH = auth_headers()
 
 ELEVATED = {"patient_id": "DEMO-BACKUP-001", "age": 70, "heart_rate": 180, "spo2": 78, "systolic_bp": 80,
             "diastolic_bp": 50, "temperature": 39.5, "respiratory_rate": 34}
@@ -14,9 +17,9 @@ def _seed_records() -> None:
     with TestClient(app) as client:
         client.post("/api/v1/risk/predict", json=ELEVATED)
         client.post("/api/v1/demo/observations", json={"patient_id": "DEMO-BACKUP-002", "scenario": "worsening", "step": 2})
-        alert_id = client.get("/api/v1/alerts").json()["items"][0]["id"]
-        client.post(f"/api/v1/alerts/{alert_id}/acknowledge", json={"actor": "demo-nurse"})
-        client.post(f"/api/v1/alerts/{alert_id}/resolve", json={"actor": "demo-nurse"})
+        alert_id = client.get("/api/v1/alerts", headers=AUTH).json()["items"][0]["id"]
+        client.post(f"/api/v1/alerts/{alert_id}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})
+        client.post(f"/api/v1/alerts/{alert_id}/resolve", headers=AUTH, json={"actor": "demo-nurse"})
 
 
 def _restore_targets(tmp_path):

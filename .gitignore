@@ -28,3 +28,11 @@ pnpm-debug.log*
 coverage/
 playwright-report/
 test-results/
+
+# Python environments and downloaded/derived ML data (never committed)
+.venv/
+__pycache__/
+ml/data/physionet-2019/
+ml/runs/
+ml/artifacts/
+backend/*.sqlite3

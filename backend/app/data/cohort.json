@@ -1,0 +1,822 @@
+{
+ "_comment": "Fictional synthetic cohort shared by the backend and the frontend. Not real people or patients.",
+ "version": 1,
+ "staff": [
+  {
+   "username": "admin.demo",
+   "display_name": "Admin (demo)",
+   "role": "admin",
+   "wards": [
+    "General Ward",
+    "Cardiology",
+    "ICU",
+    "Emergency"
+   ]
+  },
+  {
+   "username": "nurse.demo",
+   "display_name": "Nurse Kavitha (demo)",
+   "role": "nurse",
+   "wards": [
+    "General Ward",
+    "Cardiology",
+    "ICU",
+    "Emergency"
+   ]
+  },
+  {
+   "username": "doctor.demo",
+   "display_name": "Dr. Asha Rao",
+   "role": "doctor",
+   "wards": [
+    "ICU"
+   ]
+  },
+  {
+   "username": "dr.khan",
+   "display_name": "Dr. Imran Khan",
+   "role": "doctor",
+   "wards": [
+    "Emergency"
+   ]
+  },
+  {
+   "username": "dr.mehta",
+   "display_name": "Dr. Neha Mehta",
+   "role": "doctor",
+   "wards": [
+    "Cardiology"
+   ]
+  },
+  {
+   "username": "dr.iyer",
+   "display_name": "Dr. Karthik Iyer",
+   "role": "doctor",
+   "wards": [
+    "General Ward"
+   ]
+  }
+ ],
+ "patients": [
+  {
+   "id": "P-SIM-001",
+   "name": "Arjun Sharma",
+   "age": 64,
+   "sex": "M",
+   "ward": "General Ward",
+   "bed": "A-12",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 74,
+    "spo2": 96,
+    "systolic_bp": 134,
+    "diastolic_bp": 83,
+    "temperature": 37.1,
+    "respiratory_rate": 16
+   }
+  },
+  {
+   "id": "P-SIM-002",
+   "name": "Ananya Singh",
+   "age": 58,
+   "sex": "F",
+   "ward": "Cardiology",
+   "bed": "C-07",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 69,
+    "spo2": 97,
+    "systolic_bp": 117,
+    "diastolic_bp": 74,
+    "temperature": 36.8,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-003",
+   "name": "Vikram Varma",
+   "age": 71,
+   "sex": "M",
+   "ward": "ICU",
+   "bed": "B-14",
+   "scenario": "worsening",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 2,
+   "baseline": {
+    "heart_rate": 67,
+    "spo2": 95,
+    "systolic_bp": 126,
+    "diastolic_bp": 80,
+    "temperature": 36.6,
+    "respiratory_rate": 15
+   }
+  },
+  {
+   "id": "P-SIM-004",
+   "name": "Fatima Reddy",
+   "age": 45,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-03",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 110,
+    "spo2": 91,
+    "systolic_bp": 99,
+    "diastolic_bp": 60,
+    "temperature": 38.1,
+    "respiratory_rate": 22
+   }
+  },
+  {
+   "id": "P-SIM-005",
+   "name": "Anil Bose",
+   "age": 52,
+   "sex": "M",
+   "ward": "General Ward",
+   "bed": "A-21",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 68,
+    "spo2": 95,
+    "systolic_bp": 122,
+    "diastolic_bp": 81,
+    "temperature": 37.1,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-006",
+   "name": "Kavya Hegde",
+   "age": 67,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-09",
+   "scenario": "worsening",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 18,
+   "baseline": {
+    "heart_rate": 69,
+    "spo2": 99,
+    "systolic_bp": 131,
+    "diastolic_bp": 74,
+    "temperature": 37.0,
+    "respiratory_rate": 16
+   }
+  },
+  {
+   "id": "P-SIM-007",
+   "name": "Daniel Nair",
+   "age": 39,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-11",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 72,
+    "spo2": 95,
+    "systolic_bp": 119,
+    "diastolic_bp": 83,
+    "temperature": 36.9,
+    "respiratory_rate": 14
+   }
+  },
+  {
+   "id": "P-SIM-008",
+   "name": "Divya Pillai",
+   "age": 75,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-08",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 112,
+    "spo2": 90,
+    "systolic_bp": 104,
+    "diastolic_bp": 62,
+    "temperature": 38.4,
+    "respiratory_rate": 26
+   }
+  },
+  {
+   "id": "P-SIM-009",
+   "name": "Nisha Ali",
+   "age": 61,
+   "sex": "F",
+   "ward": "General Ward",
+   "bed": "A-08",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 65,
+    "spo2": 99,
+    "systolic_bp": 113,
+    "diastolic_bp": 84,
+    "temperature": 37.2,
+    "respiratory_rate": 17
+   }
+  },
+  {
+   "id": "P-SIM-010",
+   "name": "Joseph Patel",
+   "age": 78,
+   "sex": "M",
+   "ward": "ICU",
+   "bed": "B-03",
+   "scenario": "worsening",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 6,
+   "baseline": {
+    "heart_rate": 68,
+    "spo2": 96,
+    "systolic_bp": 114,
+    "diastolic_bp": 73,
+    "temperature": 36.7,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-011",
+   "name": "Aisha Gupta",
+   "age": 49,
+   "sex": "F",
+   "ward": "Cardiology",
+   "bed": "C-15",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 72,
+    "spo2": 97,
+    "systolic_bp": 127,
+    "diastolic_bp": 78,
+    "temperature": 36.7,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-012",
+   "name": "Sameer Rao",
+   "age": 56,
+   "sex": "M",
+   "ward": "Emergency",
+   "bed": "E-11",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 104,
+    "spo2": 92,
+    "systolic_bp": 105,
+    "diastolic_bp": 61,
+    "temperature": 38.4,
+    "respiratory_rate": 25
+   }
+  },
+  {
+   "id": "P-SIM-013",
+   "name": "Sneha Das",
+   "age": 83,
+   "sex": "F",
+   "ward": "General Ward",
+   "bed": "A-17",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 73,
+    "spo2": 95,
+    "systolic_bp": 125,
+    "diastolic_bp": 75,
+    "temperature": 37.1,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-014",
+   "name": "Nikhil Joshi",
+   "age": 69,
+   "sex": "M",
+   "ward": "ICU",
+   "bed": "B-18",
+   "scenario": "worsening",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 19,
+   "baseline": {
+    "heart_rate": 76,
+    "spo2": 96,
+    "systolic_bp": 127,
+    "diastolic_bp": 77,
+    "temperature": 37.0,
+    "respiratory_rate": 15
+   }
+  },
+  {
+   "id": "P-SIM-015",
+   "name": "Usha Saxena",
+   "age": 42,
+   "sex": "F",
+   "ward": "Cardiology",
+   "bed": "C-02",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 64,
+    "spo2": 95,
+    "systolic_bp": 119,
+    "diastolic_bp": 79,
+    "temperature": 36.7,
+    "respiratory_rate": 16
+   }
+  },
+  {
+   "id": "P-SIM-016",
+   "name": "Imtiaz Menon",
+   "age": 73,
+   "sex": "M",
+   "ward": "Emergency",
+   "bed": "E-06",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 6,
+   "baseline": {
+    "heart_rate": 77,
+    "spo2": 97,
+    "systolic_bp": 122,
+    "diastolic_bp": 73,
+    "temperature": 37.2,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-017",
+   "name": "Shalini Fernandes",
+   "age": 60,
+   "sex": "F",
+   "ward": "General Ward",
+   "bed": "A-25",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 111,
+    "spo2": 92,
+    "systolic_bp": 99,
+    "diastolic_bp": 62,
+    "temperature": 38.3,
+    "respiratory_rate": 25
+   }
+  },
+  {
+   "id": "P-SIM-018",
+   "name": "Thomas Mathew",
+   "age": 51,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-09",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 80,
+    "spo2": 98,
+    "systolic_bp": 127,
+    "diastolic_bp": 74,
+    "temperature": 36.6,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-019",
+   "name": "Bhavna Kulkarni",
+   "age": 66,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-21",
+   "scenario": "stable",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 66,
+    "spo2": 98,
+    "systolic_bp": 114,
+    "diastolic_bp": 76,
+    "temperature": 36.7,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-020",
+   "name": "Manoj Chopra",
+   "age": 47,
+   "sex": "M",
+   "ward": "Emergency",
+   "bed": "E-14",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 109,
+    "spo2": 90,
+    "systolic_bp": 102,
+    "diastolic_bp": 61,
+    "temperature": 38.5,
+    "respiratory_rate": 25
+   }
+  },
+  {
+   "id": "P-SIM-021",
+   "name": "Arjun Sharma",
+   "age": 51,
+   "sex": "M",
+   "ward": "General Ward",
+   "bed": "A-30",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 67,
+    "spo2": 98,
+    "systolic_bp": 117,
+    "diastolic_bp": 73,
+    "temperature": 36.6,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-022",
+   "name": "Rohan Singh",
+   "age": 25,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-16",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 9,
+   "baseline": {
+    "heart_rate": 76,
+    "spo2": 99,
+    "systolic_bp": 113,
+    "diastolic_bp": 84,
+    "temperature": 36.5,
+    "respiratory_rate": 14
+   }
+  },
+  {
+   "id": "P-SIM-023",
+   "name": "Lakshmi Varma",
+   "age": 48,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-01",
+   "scenario": "stable",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 72,
+    "spo2": 95,
+    "systolic_bp": 119,
+    "diastolic_bp": 83,
+    "temperature": 37.1,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-024",
+   "name": "Fatima Reddy",
+   "age": 74,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-29",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 104,
+    "spo2": 90,
+    "systolic_bp": 102,
+    "diastolic_bp": 61,
+    "temperature": 38.6,
+    "respiratory_rate": 22
+   }
+  },
+  {
+   "id": "P-SIM-025",
+   "name": "Sara Bose",
+   "age": 53,
+   "sex": "F",
+   "ward": "General Ward",
+   "bed": "A-27",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 82,
+    "spo2": 95,
+    "systolic_bp": 114,
+    "diastolic_bp": 81,
+    "temperature": 36.8,
+    "respiratory_rate": 14
+   }
+  },
+  {
+   "id": "P-SIM-026",
+   "name": "Farhan Hegde",
+   "age": 31,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-22",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 19,
+   "baseline": {
+    "heart_rate": 74,
+    "spo2": 96,
+    "systolic_bp": 120,
+    "diastolic_bp": 80,
+    "temperature": 36.6,
+    "respiratory_rate": 15
+   }
+  },
+  {
+   "id": "P-SIM-027",
+   "name": "Meena Nair",
+   "age": 31,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-06",
+   "scenario": "stable",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 81,
+    "spo2": 95,
+    "systolic_bp": 132,
+    "diastolic_bp": 81,
+    "temperature": 36.8,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-028",
+   "name": "Divya Pillai",
+   "age": 54,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-12",
+   "scenario": "stable",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 71,
+    "spo2": 96,
+    "systolic_bp": 120,
+    "diastolic_bp": 74,
+    "temperature": 36.9,
+    "respiratory_rate": 17
+   }
+  },
+  {
+   "id": "P-SIM-029",
+   "name": "Kabir Ali",
+   "age": 74,
+   "sex": "M",
+   "ward": "General Ward",
+   "bed": "A-20",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 3,
+   "baseline": {
+    "heart_rate": 68,
+    "spo2": 96,
+    "systolic_bp": 134,
+    "diastolic_bp": 71,
+    "temperature": 36.9,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-030",
+   "name": "Joseph Patel",
+   "age": 27,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-28",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 107,
+    "spo2": 90,
+    "systolic_bp": 103,
+    "diastolic_bp": 60,
+    "temperature": 38.3,
+    "respiratory_rate": 25
+   }
+  },
+  {
+   "id": "P-SIM-031",
+   "name": "Aisha Gupta",
+   "age": 24,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-23",
+   "scenario": "stable",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 81,
+    "spo2": 99,
+    "systolic_bp": 121,
+    "diastolic_bp": 82,
+    "temperature": 36.8,
+    "respiratory_rate": 16
+   }
+  },
+  {
+   "id": "P-SIM-032",
+   "name": "Radha Rao",
+   "age": 81,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-01",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 2,
+   "baseline": {
+    "heart_rate": 76,
+    "spo2": 96,
+    "systolic_bp": 125,
+    "diastolic_bp": 75,
+    "temperature": 36.6,
+    "respiratory_rate": 14
+   }
+  },
+  {
+   "id": "P-SIM-033",
+   "name": "Harish Das",
+   "age": 38,
+   "sex": "M",
+   "ward": "General Ward",
+   "bed": "A-02",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 64,
+    "spo2": 95,
+    "systolic_bp": 131,
+    "diastolic_bp": 73,
+    "temperature": 36.8,
+    "respiratory_rate": 17
+   }
+  },
+  {
+   "id": "P-SIM-034",
+   "name": "Grace Joshi",
+   "age": 28,
+   "sex": "F",
+   "ward": "Cardiology",
+   "bed": "C-18",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 105,
+    "spo2": 92,
+    "systolic_bp": 105,
+    "diastolic_bp": 66,
+    "temperature": 38.5,
+    "respiratory_rate": 23
+   }
+  },
+  {
+   "id": "P-SIM-035",
+   "name": "Usha Saxena",
+   "age": 50,
+   "sex": "F",
+   "ward": "ICU",
+   "bed": "B-29",
+   "scenario": "stable",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 71,
+    "spo2": 99,
+    "systolic_bp": 120,
+    "diastolic_bp": 84,
+    "temperature": 37.0,
+    "respiratory_rate": 18
+   }
+  },
+  {
+   "id": "P-SIM-036",
+   "name": "Rekha Menon",
+   "age": 47,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-15",
+   "scenario": "worsening",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 8,
+   "baseline": {
+    "heart_rate": 68,
+    "spo2": 98,
+    "systolic_bp": 117,
+    "diastolic_bp": 81,
+    "temperature": 37.2,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-037",
+   "name": "Shalini Fernandes",
+   "age": 55,
+   "sex": "F",
+   "ward": "General Ward",
+   "bed": "A-23",
+   "scenario": "stable",
+   "assigned_doctor": "dr.iyer",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 77,
+    "spo2": 95,
+    "systolic_bp": 117,
+    "diastolic_bp": 78,
+    "temperature": 36.8,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-038",
+   "name": "Thomas Mathew",
+   "age": 41,
+   "sex": "M",
+   "ward": "Cardiology",
+   "bed": "C-05",
+   "scenario": "stable",
+   "assigned_doctor": "dr.mehta",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 74,
+    "spo2": 97,
+    "systolic_bp": 117,
+    "diastolic_bp": 76,
+    "temperature": 36.9,
+    "respiratory_rate": 14
+   }
+  },
+  {
+   "id": "P-SIM-039",
+   "name": "Ajay Kulkarni",
+   "age": 28,
+   "sex": "M",
+   "ward": "ICU",
+   "bed": "B-10",
+   "scenario": "worsening",
+   "assigned_doctor": "doctor.demo",
+   "onset_step": 14,
+   "baseline": {
+    "heart_rate": 77,
+    "spo2": 99,
+    "systolic_bp": 125,
+    "diastolic_bp": 70,
+    "temperature": 36.6,
+    "respiratory_rate": 13
+   }
+  },
+  {
+   "id": "P-SIM-040",
+   "name": "Leela Chopra",
+   "age": 89,
+   "sex": "F",
+   "ward": "Emergency",
+   "bed": "E-13",
+   "scenario": "recovering",
+   "assigned_doctor": "dr.khan",
+   "onset_step": 0,
+   "baseline": {
+    "heart_rate": 104,
+    "spo2": 92,
+    "systolic_bp": 101,
+    "diastolic_bp": 63,
+    "temperature": 38.5,
+    "respiratory_rate": 25
+   }
+  }
+ ]
+}

@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from websockets.sync.client import connect
 
-from conftest import POSTGRES_TEST_URL, reset_postgres_schema
+from conftest import POSTGRES_TEST_URL, auth_headers, reset_postgres_schema
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.skipif(not POSTGRES_TEST_URL, reason="VITALGUARD_TEST_POSTGRES_URL not set")
@@ -162,7 +162,8 @@ def test_concurrent_writes_on_both_instances_reach_every_client_exactly_once(clu
 
 def test_same_stream_sequence_sent_to_both_instances_is_stored_once(cluster):
     a, b = cluster
-    session = httpx.post(f"{a.url}/api/v1/live-demo/sessions", json={"scenario": "worsening", "takeover": True}, timeout=10).json()
+    session = httpx.post(f"{a.url}/api/v1/live-demo/sessions", json={"scenario": "worsening", "takeover": True},
+                         headers=auth_headers(), timeout=10).json()
     session_id, headers = session["session"]["session_id"], {"X-Producer-Token": session["producer_token"]}
     barrier = threading.Barrier(2)
 

@@ -97,8 +97,11 @@ def list_alerts_by_event_keys(event_keys: list[str]) -> list[dict]:
 
 
 def list_alerts(status: str | None = None, patient_id: str | None = None, limit: int = 50,
-                before_id: int | None = None) -> list[dict]:
+                before_id: int | None = None, patient_ids: set[str] | None = None) -> list[dict]:
+    """Newest first. `patient_ids`, when given, restricts results to those patients (an empty set matches none)."""
     query = select(alerts)
+    if patient_ids is not None:
+        query = query.where(alerts.c.patient_id.in_(sorted(patient_ids)))
     if status:
         query = query.where(alerts.c.status == status)
     if patient_id:

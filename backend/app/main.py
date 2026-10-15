@@ -18,6 +18,7 @@ from .stream_service import StreamError
 from .timeline_routes import router as timeline_router
 from .trend_routes import router as trend_router
 from .alert_routes import router as alert_router
+from .auth_routes import router as auth_router
 from .data_quality import assess_observations
 from .event_broker import events, events_after, sequence_bounds
 from .notification_routes import router as notification_router
@@ -55,6 +56,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="VitalGuard AI Risk Engine", version="0.8.0",
     description="Synthetic demo risk API. Not clinically validated and not for clinical use.", lifespan=lifespan)
+app.include_router(auth_router)
 app.include_router(simulator_router)
 app.include_router(live_router)
 app.include_router(notification_router)

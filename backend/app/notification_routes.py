@@ -1,8 +1,10 @@
 """Web Push endpoints. Subscriptions are device-scoped; X-Subscription-Token proves ownership."""
 import os
-from fastapi import APIRouter, Header, Request, Response
+from typing import Any
+from fastapi import APIRouter, Depends, Header, Request, Response
 from starlette.concurrency import run_in_threadpool
 from . import notification_service as service
+from .auth import current_user
 from .notification_service import notifications
 from .schemas import PushPreferences, PushReceipt, PushRegistration
 
@@ -13,16 +15,20 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 def push_config():
     """Whether push is available and the VAPID public key (never the private key)."""
     return {"push_available": service.push_configured(), "vapid_public_key": service.vapid_public_key(),
-            "min_severity_options": ["high", "critical"], "ownership": "device-scoped token (no user accounts)",
+            "min_severity_options": ["high", "critical"],
+            "ownership": "device token; registered by a signed-in user",
+            "targeting": "alerts are pushed only to the assigned doctor's devices",
             "fallback": "in-app alert center (/#/alerts)", "demo_only": True}
 
 
 @router.post("/subscriptions", status_code=201)
-async def register_subscription(payload: PushRegistration, request: Request):
+async def register_subscription(payload: PushRegistration, request: Request,
+                                user: dict[str, Any] = Depends(current_user)):
     # Receipts from the service worker go back to this API; VITALGUARD_PUBLIC_API_URL overrides behind proxies.
     receipt_base = os.getenv("VITALGUARD_PUBLIC_API_URL") or str(request.base_url).rstrip("/")
     subscription, token = await run_in_threadpool(service.register, payload.subscription.endpoint,
-        payload.subscription.keys.p256dh, payload.subscription.keys.auth, payload.min_severity, receipt_base)
+        payload.subscription.keys.p256dh, payload.subscription.keys.auth, payload.min_severity, receipt_base,
+        user["username"], user["role"])
     return {"subscription": subscription, "management_token": token, "demo_only": True}
 
 

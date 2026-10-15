@@ -35,6 +35,9 @@ from sqlalchemy.exc import OperationalError
 from app import observation_service, stream_service
 from app.storage import get_engine
 from app.storage_schema import alerts, observations
+from conftest import auth_headers
+
+AUTH = auth_headers()
 
 LIVE = "/api/v1/live-demo"
 
@@ -51,7 +54,7 @@ def _count(table) -> int:
 
 
 def start_stream(client, **body):
-    response = client.post(f"{LIVE}/sessions", json={"scenario": "worsening", "interval_ms": 500, **body})
+    response = client.post(f"{LIVE}/sessions", headers=AUTH, json={"scenario": "worsening", "interval_ms": 500, **body})
     assert response.status_code == 201, response.text
     data = response.json()
     return data["session"]["session_id"], data["producer_token"]
@@ -154,7 +157,7 @@ def test_second_producer_is_rejected_unless_it_explicitly_takes_over(database):
         first_id, first_token = start_stream(client)
         receive_type(receiver, "stream.state")
 
-        rejected = client.post(f"{LIVE}/sessions", json={"scenario": "stable"})
+        rejected = client.post(f"{LIVE}/sessions", headers=AUTH, json={"scenario": "stable"})
         assert rejected.status_code == 409
         assert rejected.json()["error"] == "producer_active"
         assert rejected.json()["active_session"]["session_id"] == first_id
@@ -276,7 +279,7 @@ def test_concurrent_submissions_of_one_sequence_persist_once(database):
 def test_concurrent_starts_leave_exactly_one_active_session(database):
     with TestClient(app) as client:
         with ThreadPoolExecutor(max_workers=5) as pool:
-            results = list(pool.map(lambda _: client.post(f"{LIVE}/sessions", json={"scenario": "stable"}), range(5)))
+            results = list(pool.map(lambda _: client.post(f"{LIVE}/sessions", headers=AUTH, json={"scenario": "stable"}), range(5)))
     assert sorted(result.status_code for result in results) == [201, 409, 409, 409, 409]
 
 
@@ -293,10 +296,10 @@ def test_producer_key_gates_starting_a_stream(database, monkeypatch):
     monkeypatch.setenv("VITALGUARD_STREAM_PRODUCER_KEY", "demo-key-for-tests")
     with TestClient(app) as client:
         assert client.get(f"{LIVE}/config").json()["producer_key_required"] is True
-        missing = client.post(f"{LIVE}/sessions", json={"scenario": "stable"})
-        wrong = client.post(f"{LIVE}/sessions", json={"scenario": "stable"}, headers={"X-Demo-Producer-Key": "nope"})
+        missing = client.post(f"{LIVE}/sessions", headers=AUTH, json={"scenario": "stable"})
+        wrong = client.post(f"{LIVE}/sessions", json={"scenario": "stable"}, headers={**AUTH, "X-Demo-Producer-Key": "nope"})
         allowed = client.post(f"{LIVE}/sessions", json={"scenario": "stable"},
-                              headers={"X-Demo-Producer-Key": "demo-key-for-tests"})
+                              headers={**AUTH, "X-Demo-Producer-Key": "demo-key-for-tests"})
     assert (missing.status_code, wrong.status_code, allowed.status_code) == (403, 403, 201)
     assert "demo-key-for-tests" not in missing.text
 
@@ -359,8 +362,8 @@ def test_recovery_endpoint_returns_every_event_type_in_order(database):
     with TestClient(app) as client:
         session_id, token = start_stream(client)
         emits = [emit(client, session_id, token, sequence).json()["event"] for sequence in range(8)]
-        alert_id = client.get("/api/v1/alerts", params={"limit": 1}).json()["items"][0]["id"]
-        client.post(f"/api/v1/alerts/{alert_id}/acknowledge", json={"actor": "demo-nurse"})
+        alert_id = client.get("/api/v1/alerts", headers=AUTH, params={"limit": 1}).json()["items"][0]["id"]
+        client.post(f"/api/v1/alerts/{alert_id}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})
         client.post(f"{LIVE}/sessions/{session_id}/stop", headers={"X-Producer-Token": token})
         page = client.get("/api/v1/events", params={"after_seq": 0, "limit": 500}).json()
         filtered = client.get("/api/v1/events", params={"after_seq": emits[3]["event_seq"], "session_id": session_id}).json()
@@ -399,9 +402,9 @@ def test_alert_transitions_are_broadcast(database):
         receiver.receive_json()
         client.post("/api/v1/risk/predict", json=ELEVATED_VITALS)
         alert = receive_type(receiver, "alert.created")["alert"]
-        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", json={"actor": "demo-nurse"})
+        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})
         updated = receive_type(receiver, "alert.updated")
-        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", json={"actor": "demo-nurse"})  # no change, no event
+        client.post(f"/api/v1/alerts/{alert['id']}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})  # no change, no event
         assert_no_pending_events(receiver)
     assert updated["alert"]["status"] == "acknowledged" and updated["action"] == "acknowledge"
 

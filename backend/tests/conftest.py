@@ -41,3 +41,9 @@ def database(request, tmp_path, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
         monkeypatch.setenv("VITALGUARD_DB_PATH", str(tmp_path / "persistence.sqlite3"))
     yield request.param
+
+
+def auth_headers(username: str = "admin.demo") -> dict[str, str]:
+    """Bearer header for a demo staff account (see app/data/cohort.json)."""
+    from app.auth import issue_token
+    return {"Authorization": f"Bearer {issue_token(username)}"}

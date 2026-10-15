@@ -47,6 +47,9 @@ def test_ingestion_rejects_invalid_requests(client):
 
 # --- Live-demo streams reuse the same deterministic simulator ---------------------------
 from app import stream_service
+from conftest import auth_headers
+
+AUTH = auth_headers()
 
 
 @pytest.fixture
@@ -56,7 +59,7 @@ def stream_client(client, monkeypatch):
 
 
 def _stream(client, scenario, count):
-    session = client.post("/api/v1/live-demo/sessions", json={"scenario": scenario, "takeover": True}).json()
+    session = client.post("/api/v1/live-demo/sessions", headers=AUTH, json={"scenario": scenario, "takeover": True}).json()
     headers = {"X-Producer-Token": session["producer_token"]}
     path = f"/api/v1/live-demo/sessions/{session['session']['session_id']}/observations"
     return [client.post(path, json={"sequence": sequence}, headers=headers).json()["event"] for sequence in range(count)]
@@ -86,11 +89,11 @@ def test_stream_scores_follow_the_scenario_direction(stream_client):
     {"scenario": "stable", "extra": True},
 ])
 def test_invalid_stream_requests_are_rejected(client, body):
-    assert client.post("/api/v1/live-demo/sessions", json=body).status_code == 422
+    assert client.post("/api/v1/live-demo/sessions", headers=AUTH, json=body).status_code == 422
 
 
 def test_invalid_sequence_is_rejected(client):
-    session = client.post("/api/v1/live-demo/sessions", json={"scenario": "stable"}).json()
+    session = client.post("/api/v1/live-demo/sessions", headers=AUTH, json={"scenario": "stable"}).json()
     path = f"/api/v1/live-demo/sessions/{session['session']['session_id']}/observations"
     headers = {"X-Producer-Token": session["producer_token"]}
     for sequence in (-1, 1001, "zero"):
@@ -109,7 +112,7 @@ def test_high_risk_simulator_observation_creates_alert_and_audit(client, monkeyp
     prediction = response.json()
     assert prediction["risk_score"] == 90
 
-    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-ALERT-HIGH-001"})
+    alerts = client.get("/api/v1/alerts", headers=AUTH, params={"patient_id": "DEMO-ALERT-HIGH-001"})
     assert alerts.status_code == 200
     assert alerts.json()["count"] == 1
     alert = alerts.json()["items"][0]
@@ -117,7 +120,7 @@ def test_high_risk_simulator_observation_creates_alert_and_audit(client, monkeyp
     assert alert["details"]["observation_id"] == prediction["observation_id"]
     assert alert["details"]["demo_only"] is True
 
-    audit = client.get(f"/api/v1/alerts/{alert['id']}/audit")
+    audit = client.get(f"/api/v1/alerts/{alert['id']}/audit", headers=AUTH)
     assert audit.status_code == 200
     assert any(event["action"] == "created" for event in audit.json()["items"])
 
@@ -132,6 +135,6 @@ def test_low_risk_simulator_observation_does_not_create_alert(client, monkeypatc
     assert response.status_code == 200
     assert response.json()["risk_score"] == 10
 
-    alerts = client.get("/api/v1/alerts", params={"patient_id": "DEMO-ALERT-LOW-001"})
+    alerts = client.get("/api/v1/alerts", headers=AUTH, params={"patient_id": "DEMO-ALERT-LOW-001"})
     assert alerts.status_code == 200
     assert alerts.json()["count"] == 0

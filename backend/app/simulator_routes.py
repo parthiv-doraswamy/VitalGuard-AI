@@ -1,6 +1,6 @@
 """Demo-only API for submitting deterministic synthetic observations."""
-from typing import Literal
-from fastapi import APIRouter, Header, Query
+from typing import Any, Literal
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from .event_broker import events
@@ -8,6 +8,7 @@ from .observation_service import record_observation, utc_now
 from .schemas import RiskPrediction, StreamObservationRequest, StreamStartRequest
 from .simulator import observation_for_step
 from . import stream_service
+from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo-simulator"])
 
@@ -50,11 +51,12 @@ def stream_session(session_id: str):
 
 @live_router.post("/sessions", status_code=201)
 async def start_stream(payload: StreamStartRequest,
-                       x_demo_producer_key: str | None = Header(default=None)):
-    """Start the single active producer session. The producer token is returned only here."""
+                       x_demo_producer_key: str | None = Header(default=None),
+                       _user: dict[str, Any] = Depends(require_roles("admin", "nurse"))):
+    """Start the single active producer session (admin or nurse). The producer token is returned only here."""
     session, token, replaced = await run_in_threadpool(stream_service.start_session,
         scenario=payload.scenario, patient_id=payload.patient_id, interval_ms=payload.interval_ms,
-        takeover=payload.takeover, producer_key=x_demo_producer_key)
+        takeover=payload.takeover, producer_key=x_demo_producer_key, mode=payload.mode)
     # stream.state events were written to the outbox in the same transaction.
     await events.after_commit()
     return {"session": session, "producer_token": token, "replaced_session": replaced, "demo_only": True}
@@ -91,11 +93,12 @@ async def emit_stream_observation(session_id: str, payload: StreamObservationReq
     duplicate=true; no new record, alert or broadcast is created.
     """
     received_at = utc_now()
-    event, duplicate = await run_in_threadpool(stream_service.emit_observation,
+    emitted, duplicate = await run_in_threadpool(stream_service.emit_observation,
         session_id, x_producer_token, payload.sequence, received_at)
     if not duplicate:
         await events.after_commit()
-    return {"event": event, "duplicate": duplicate, "demo_only": True}
+    # `event` is the first observation of the sequence (single-patient streams have exactly one).
+    return {"event": emitted[0], "events": emitted, "duplicate": duplicate, "demo_only": True}
 
 
 @live_router.get("/events")
