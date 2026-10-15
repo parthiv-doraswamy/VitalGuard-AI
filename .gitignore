@@ -36,3 +36,7 @@ ml/data/physionet-2019/
 ml/runs/
 ml/artifacts/
 backend/*.sqlite3
+
+# Local tool output
+.playwright-mcp/
+.claude/
