@@ -8,6 +8,7 @@ import { RiskEnginePanel } from '../components/settings/RiskEnginePanel.tsx';
 import { ModelEvaluationPanel } from '../components/settings/ModelEvaluationPanel.tsx';
 import { ExplainabilityWorkbench } from '../components/settings/ExplainabilityWorkbench.tsx';
 import { News2DemoCalculator } from '../components/settings/News2DemoCalculator.tsx';
+import { PwaNotificationSettings } from '../components/settings/PwaNotificationSettings.tsx';
 function Seg<T extends string | number>({ options, value, onPick, label }: { options: readonly T[]; value: T; onPick: (v: T) => void; label: string }) {
   const labelOf = (o: T): string => {
     if (typeof o === 'number') return `${o}×`;
@@ -31,6 +32,7 @@ export function SettingsPage() {
       <PageHeader eyebrow="Configuration" title="Settings"
         subtitle="Monitoring, appearance, data source and system information."
         crumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Settings' }]} />
+      <div className="mt-4"><PwaNotificationSettings /></div>
       <div className="mt-4"><RiskEnginePanel /></div>
       <div className="mt-4"><ModelEvaluationPanel /></div>
       <div className="mt-4"><ExplainabilityWorkbench /></div>
