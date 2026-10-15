@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { Shell } from '../components/layout/Shell.tsx';
 
-import { LayoutGrid, Table2 } from 'lucide-react';
+import { Activity, LayoutGrid, Pause, Play, Table2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/Primitives.tsx';
 import { EmptyState } from '../components/ui/States.tsx';
 import { FilterBar, useFilterState } from '../components/patients/FilterBar.tsx';
@@ -12,7 +12,7 @@ import { useSimulation } from '../store/useSimulation.ts';
 
 const PAGE = 6;
 export function PatientsPage() {
-  const { patients, risks, latest } = useSimulation();
+  const { patients, risks, latest, running, start, pause, tick } = useSimulation();
   const [filters, setFilters] = useFilterState();
   const [view, setView] = useState<'table' | 'cards'>('table');
   const [page, setPage] = useState(0);
@@ -44,6 +44,16 @@ export function PatientsPage() {
             <button onClick={() => setView('cards')} aria-pressed={view === 'cards'} aria-label="Card view" className={`p-2 transition-all ${view === 'cards' ? 'text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`} style={view === 'cards' ? { background: 'linear-gradient(135deg,#0f766e,#0891b2)' } : undefined}><LayoutGrid size={16} /></button>
           </div>
         )} />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50/70 p-4 dark:border-teal-900 dark:bg-teal-950/30">
+        <div className="flex items-center gap-3">
+          <span className={`grid h-10 w-10 place-items-center rounded-xl ${running ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}><Activity size={19} /></span>
+          <div><p className="font-semibold text-slate-900 dark:text-slate-100">{running ? 'Live synthetic monitoring is running' : 'Live monitoring demo is paused'}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">{running ? `All ${patients.length} demo patients refresh automatically · update #${tick}` : 'Start the stream to update vitals, risk signals and generate threshold alerts.'}</p></div>
+        </div>
+        <button type="button" onClick={running ? pause : start} className="btn-primary inline-flex items-center gap-2" aria-pressed={running}>
+          {running ? <><Pause size={15} /> Pause stream</> : <><Play size={15} /> Start live demo</>}
+        </button>
+      </div>
       <div className="mt-4"><FilterBar value={filters} onChange={onFilter} resultCount={rows.length} /></div>
       {slice.length === 0 ? (
         <div className="mt-4"><EmptyState title="No patients match these filters." hint="Adjust search or clear filters." /></div>
