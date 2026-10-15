@@ -40,3 +40,4 @@ backend/*.sqlite3
 # Local tool output
 .playwright-mcp/
 .claude/
+backend/*.sqlite3-*

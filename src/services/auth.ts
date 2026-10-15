@@ -29,7 +29,6 @@ export const ACCESS = {
   patients: ['admin', 'nurse', 'doctor'],
   alerts: ['admin', 'nurse', 'doctor'],
   liveDemo: ['admin', 'nurse'],
-  history: ['admin', 'nurse'],
   analytics: ['admin', 'doctor'],
   modelPerformance: ['admin', 'doctor'],
   settings: ['admin', 'nurse', 'doctor'],
@@ -45,7 +44,7 @@ export type Permission = keyof typeof ACCESS;
 
 export const ROLE_SUMMARY: Record<Role, string> = {
   admin: 'Full access: live stream control, every patient, model performance, staff and system settings.',
-  nurse: 'All wards: monitoring, live stream control, alert acknowledgement and history.',
+  nurse: 'All wards: monitoring, live stream control and alert acknowledgement.',
   doctor: 'Assigned patients only: their alerts (acknowledge and resolve), push notifications and model insights.',
 };
 

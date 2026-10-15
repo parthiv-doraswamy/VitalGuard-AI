@@ -10,7 +10,7 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
   const { running, lastRefresh, refresh } = useSimulation();
   const { alerts } = useScope();
   const session = useSession();
-  const initials = (session?.displayName ?? 'Demo').replace(/^Dr\.\s*/, '').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (session?.displayName ?? 'Demo').replace(/^Dr\.\s*/, '').replace(/\(.*?\)/g, '').trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   const open = alerts.filter((a) => a.status === 'open').length;
   const [spinning, setSpinning] = useState(false);
   return (

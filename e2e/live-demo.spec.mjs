@@ -16,6 +16,8 @@ async function signIn(page) {
 }
 
 async function startStream(producer, scenario) {
+  // These checks follow one fictional patient's events; the cohort mode is covered below.
+  await producer.getByLabel('Stream mode').selectOption('patient');
   await producer.getByLabel('Stream scenario').selectOption(scenario);
   await producer.getByLabel('Stream interval').selectOption('1000');
   await producer.getByRole('button', { name: 'Start stream' }).click();
@@ -149,4 +151,20 @@ test('a second producer is refused until it explicitly takes over', async ({ bro
   // The first producer learns on its next request that it no longer owns an active stream.
   await expect(first.getByTestId('producer-phase')).toHaveText('stopped', { timeout: 10_000 });
   await second.getByRole('button', { name: 'Stop stream' }).click();
+});
+
+test('a cohort stream updates the existing patients on the ward board', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/#/live-demo');
+  await page.getByLabel('Stream mode').selectOption('cohort');
+  await page.getByLabel('Stream interval').selectOption('1000');
+  await page.getByRole('button', { name: 'Start stream' }).click();
+  const takeover = page.getByRole('button', { name: 'Take over and start' });
+  if (await takeover.isVisible({ timeout: 1500 }).catch(() => false)) await takeover.click();
+  await expect(page.getByTestId('producer-phase')).toHaveText('running');
+  const tile = page.getByTestId('ward-tile-P-SIM-003');
+  const before = await tile.textContent();
+  await expect.poll(async () => tile.textContent(), { timeout: 20_000 }).not.toBe(before);
+  await page.getByRole('button', { name: 'Stop stream' }).click();
+  await expect(page.getByTestId('producer-phase')).toHaveText('stopped');
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Bell, BarChart3, BrainCircuit, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X, History } from 'lucide-react';
+import { Activity, Bell, BarChart3, BrainCircuit, LayoutDashboard, Radio, Settings, ShieldCheck, Users, Menu, X } from 'lucide-react';
 import { useScope } from '../../store/useScope.ts';
 import { can, type Permission } from '../../services/auth.ts';
 import { useSession } from '../../services/useSession.ts';
@@ -10,7 +10,6 @@ const links: { to: string; label: string; icon: typeof Bell; permission: Permiss
   { to: '/live-demo', label: 'Live demo', icon: Radio, permission: 'liveDemo' },
   { to: '/patients', label: 'Patients', icon: Users, permission: 'patients' },
   { to: '/alerts', label: 'Alerts', icon: Bell, permission: 'alerts' },
-  { to: '/history', label: 'History', icon: History, permission: 'history' },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, permission: 'analytics' },
   { to: '/model-performance', label: 'Model performance', icon: BrainCircuit, permission: 'modelPerformance' },
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings' },

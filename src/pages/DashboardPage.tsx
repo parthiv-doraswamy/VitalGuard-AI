@@ -10,8 +10,6 @@ import { RiskDonut } from '../components/charts/Donut.tsx';
 import { FilterBar, useFilterState } from '../components/patients/FilterBar.tsx';
 import { HeroPatient, RecentAlerts, filterCohort } from '../components/dashboard/Hero.tsx';
 import { LiveEcg } from '../components/ui/premium.tsx';
-import { LiveStatusPanel } from '../components/live/LiveStatusPanel.tsx';
-import { BackendPhase567Panel } from '../components/dashboard/BackendPhase567Panel.tsx';
 import { RISK_BANDS } from '../theme/tokens.ts';
 import { useSimulation } from '../store/useSimulation.ts';
 import { useScope } from '../store/useScope.ts';
@@ -57,9 +55,6 @@ export function DashboardPage() {
           </div>
         </div>
       </section>
-      {/* Receiver for the synchronized backend stream (Laptop B needs no controls). */}
-      <div className="mt-6"><LiveStatusPanel compact /></div>
-      <BackendPhase567Panel />
       <div className="mt-6">
         <PageHeader eyebrow="Patient monitoring" title="Patient Monitoring Overview"
           subtitle="Live patient state, risk signals and review priorities in one place."
