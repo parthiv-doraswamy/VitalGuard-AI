@@ -45,8 +45,11 @@ FEATURES = (
 MODEL_VERSION = "synthetic-logreg-0.1.0"
 ARTIFACT_ROOT = Path(__file__).resolve().parent / "model_artifacts"
 DEFAULT_ARTIFACT_DIR = ARTIFACT_ROOT / MODEL_VERSION
-# Only synthetic models may be served by this demo unless an operator explicitly opts in.
 DEMO_DATASET_KINDS = {"synthetic-demo"}
+# Served without opt-in: synthetic data, and open-licensed, de-identified public research data
+# (e.g. the PhysioNet 2019 benchmark). Anything else, such as credentialed clinical data, needs
+# VITALGUARD_ALLOW_NON_DEMO_MODEL=true.
+SERVABLE_DATASET_KINDS = DEMO_DATASET_KINDS | {"public-research"}
 
 logger = logging.getLogger("vitalguard.model")
 
@@ -97,7 +100,7 @@ class ActiveModel:
     def load(cls, directory: Path, source: str = "artifact") -> "ActiveModel":
         pipeline, manifest = load_artifact(directory, FEATURES, os.getenv("VITALGUARD_MODEL_SHA256") or None)
         kind = manifest.get("dataset", {}).get("kind")
-        if kind not in DEMO_DATASET_KINDS and not _flag("VITALGUARD_ALLOW_NON_DEMO_MODEL"):
+        if kind not in SERVABLE_DATASET_KINDS and not _flag("VITALGUARD_ALLOW_NON_DEMO_MODEL"):
             raise ArtifactError(f"Artifact dataset kind '{kind}' is not allowed in the demo API")
         return cls(pipeline=pipeline, version=manifest["model_version"], source=source, manifest=manifest,
                    info={"artifact_dir": str(directory)})

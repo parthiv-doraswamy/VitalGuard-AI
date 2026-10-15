@@ -125,14 +125,14 @@ export function ExplainabilityWorkbench() {
               </div>
               <p className={`mt-1.5 text-xs flex items-center gap-1 ${positive ? 'text-rose-600 dark:text-rose-300' : 'text-teal-700 dark:text-teal-300'}`}>
                 {positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                {positive ? 'Moves model log-odds toward the synthetic positive class' : 'Moves model log-odds toward the synthetic negative class'}
+                {positive ? 'Moves model log-odds toward the positive (higher-risk) class' : 'Moves model log-odds toward the negative (lower-risk) class'}
               </p>
             </div>;
           })}
         </div>
         <p className="mt-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1.5"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{result.caveat} Contributions are not SHAP, causal effects, or clinical guidance.</p>
       </div>}
-      <p className="mt-3 text-[11px] text-slate-400">Use synthetic examples only. The model was trained on generated heuristic labels and is not clinically validated.</p>
+      <p className="mt-3 text-[11px] text-slate-400">Use fictional examples only. The active model is described under Model evaluation above; it is not clinically validated.</p>
     </section>
   );
 }

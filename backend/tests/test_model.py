@@ -40,7 +40,8 @@ def store(tmp_path, monkeypatch):
     root = tmp_path / "model_artifacts"
     root.mkdir()
     shutil.copytree(DEFAULT_ARTIFACT_DIR, root / MODEL_VERSION)
-    shutil.copy(DEFAULT_ARTIFACT_DIR.parent / "registry.json", root / "registry.json")
+    (root / "registry.json").write_text(json.dumps({"format": "vitalguard-model-registry", "active": MODEL_VERSION,
+                                                    "previous": None, "history": []}))
     monkeypatch.setattr(model_module, "ARTIFACT_ROOT", root)
     return root
 
@@ -130,15 +131,25 @@ def test_api_reports_the_version_that_is_actually_serving(store):
     assert prediction["model_probability"] == pytest.approx(active_model().predict_proba(VALID), abs=1e-4)
 
 
-def test_default_mode_is_explicit_synthetic_demo():
+def test_default_model_is_the_promoted_physionet_benchmark_model():
     with TestClient(app) as client:
         info = client.get("/api/v1/model/info").json()
-    assert info["mode"] == "synthetic-demo" and info["model_version"] == MODEL_VERSION
+    assert info["mode"] == "research-model" and info["model_version"] == "physionet2019-logistic-regression-1.0.0"
+    assert info["artifact"]["dataset_kind"] == "public-research"
     assert info["model_source"] == "artifact" and info["clinically_validated"] is False
     assert info["supports_coefficient_contributions"] is True
     # Fields from the earlier contract remain.
     for key in ("name", "model_version", "algorithm", "features", "training_data", "demo_only", "clinically_validated"):
         assert key in info
+
+
+def test_public_research_artifacts_are_servable_without_opt_in(store):
+    manifest_path = store / MODEL_VERSION / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["dataset"]["kind"] = "public-research"
+    manifest_path.write_text(json.dumps(manifest))
+    model = active_model()
+    assert model.source == "artifact" and model.mode == "research-model"
 
 
 def test_research_mode_requires_explicit_opt_in(store, monkeypatch):

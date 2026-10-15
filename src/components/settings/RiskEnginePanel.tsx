@@ -166,7 +166,7 @@ export function RiskEnginePanel() {
         </div>
       )}
 
-      <p className="mt-4 text-xs leading-relaxed text-slate-500">Important: this classifier is trained on generated synthetic data with heuristic-generated labels. It is not clinically validated and must not be used for diagnosis, triage, treatment or real patient monitoring.</p>
+      <p className="mt-4 text-xs leading-relaxed text-slate-500">Important: the active classifier (see Model evaluation for its version and training data) is not clinically validated and must not be used for diagnosis, triage, treatment or real patient monitoring.</p>
     </section>
   );
 }

@@ -1,0 +1,126 @@
+{
+  "clinically_validated": false,
+  "created_at": "2026-10-15T04:48:35.694846+00:00",
+  "dataset": {
+    "description": "PhysioNet/CinC Challenge 2019 sepsis data (7 vitals, hourly)",
+    "id": "physionet-challenge-2019-v1.0.0",
+    "kind": "public-research",
+    "label_definition": "SepsisLabel: 1 from 6 hours before clinical sepsis onset (Sepsis-3), else 0",
+    "source": "https://physionet.org/content/challenge-2019/1.0.0/",
+    "synthetic_fixture": false
+  },
+  "decision_threshold": {
+    "policy": "validation Youden J",
+    "value": 0.4964
+  },
+  "features": [
+    "age",
+    "heart_rate",
+    "spo2",
+    "systolic_bp",
+    "diastolic_bp",
+    "temperature",
+    "respiratory_rate"
+  ],
+  "format": "vitalguard-model-artifact",
+  "format_version": 1,
+  "intended_use": "research demonstration on public retrospective data \u2014 not a clinical model",
+  "library_versions": {
+    "joblib": "1.6.0",
+    "numpy": "2.5.3",
+    "python": "3.13.3",
+    "scikit_learn": "1.9.1"
+  },
+  "metrics": {
+    "test": {
+      "accuracy": 0.5975,
+      "auprc": 0.0381,
+      "auroc": 0.6514,
+      "balanced_accuracy": 0.6082,
+      "brier": 0.2378,
+      "confusion_matrix": {
+        "fn": 1007,
+        "fp": 51326,
+        "tn": 76057,
+        "tp": 1638
+      },
+      "f1": 0.0589,
+      "precision": 0.0309,
+      "sensitivity": 0.6193,
+      "specificity": 0.5971,
+      "threshold": 0.4964
+    }
+  },
+  "model_file": "model.joblib",
+  "model_sha256": "8ff18b3e319c23174c2f116648a413559bfdd4f26d7e174a7b79833b36ab0a9a",
+  "model_version": "physionet2019-logistic-regression-1.0.0",
+  "reference_inputs": [
+    [
+      58,
+      82,
+      98,
+      122,
+      78,
+      37.0,
+      16
+    ],
+    [
+      67,
+      118,
+      91,
+      96,
+      58,
+      38.4,
+      25
+    ],
+    [
+      80,
+      140,
+      85,
+      84,
+      48,
+      39.3,
+      32
+    ],
+    [
+      35,
+      64,
+      99,
+      134,
+      86,
+      36.6,
+      12
+    ],
+    [
+      72,
+      101,
+      94,
+      108,
+      66,
+      37.8,
+      21
+    ]
+  ],
+  "reference_probabilities": [
+    0.41440488985494006,
+    0.7231086000854533,
+    0.8597101331454312,
+    0.2727945847102512,
+    0.5997453815838321
+  ],
+  "selection": {
+    "compared": [
+      "Logistic Regression",
+      "Random Forest",
+      "HistGradientBoosting",
+      "XGBoost"
+    ],
+    "rule": "per feature set, highest validation AUPRC; test results are reported only after selection",
+    "selected": "Logistic Regression"
+  },
+  "training": {
+    "algorithm": "Logistic Regression",
+    "rows": 400000,
+    "run_id": "2026-10-15T04:48:35.691449+00:00"
+  }
+}

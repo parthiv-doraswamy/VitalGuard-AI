@@ -32,11 +32,12 @@ def test_health_endpoint(client):
     assert response.json()["demo_only"] is True
 
 
-def test_model_info_is_explicit_about_synthetic_data(client):
+def test_model_info_is_explicit_about_training_data(client):
     response = client.get("/api/v1/model/info")
     assert response.status_code == 200
     assert response.json()["clinically_validated"] is False
-    assert response.json()["training_data"] == "generated synthetic observations only"
+    assert response.json()["training_data"] == "PhysioNet/CinC Challenge 2019 sepsis data (7 vitals, hourly)"
+    assert response.json()["mode"] == "research-model"
 
 
 def test_prediction_is_saved_and_returns_observation_metadata(client):

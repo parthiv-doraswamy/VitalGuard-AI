@@ -1,8 +1,21 @@
 # VitalGuard AI — ML training pipeline
 
-> No clinical model has been trained. Real-dataset training is **blocked** pending
-> approved data access (see [data/README.md](data/README.md)). The API serves a
-> synthetic demo model, which is not clinically validated.
+> The API serves `physionet2019-logistic-regression-1.0.0`, trained on the open-access
+> PhysioNet/CinC Challenge 2019 sepsis dataset by `benchmark_physionet.py` (see below).
+> It is a research benchmark, not clinically validated. MIMIC-IV training remains
+> blocked pending approved data access (see [data/README.md](data/README.md)).
+
+## PhysioNet 2019 benchmark (served model)
+
+```bash
+python ml/download_physionet2019.py                  # ~40k files, resumable
+python ml/benchmark_physionet.py --save-artifact     # LR, RF, HistGB, XGBoost × two feature sets
+PYTHONPATH=backend python ml/model_registry.py promote backend/app/model_artifacts/<version> --allow-research-artifact
+```
+
+Results: `ml/reports/physionet2019_benchmark.json` and the app's *Model performance* page.
+The served artifact carries `evaluation.json` (held-out test patients), which
+`GET /api/v1/model/evaluation` returns.
 
 ## Layout
 

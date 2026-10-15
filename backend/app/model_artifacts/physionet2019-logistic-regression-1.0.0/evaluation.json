@@ -1,0 +1,48 @@
+{
+  "model_version": "physionet2019-logistic-regression-1.0.0",
+  "evaluation_type": "held-out test patients (patient-level split), PhysioNet/CinC Challenge 2019",
+  "sample_count": 130028,
+  "patient_count": 3651,
+  "positive_label_definition": "SepsisLabel: 1 from 6 hours before clinical sepsis onset (Sepsis-3), else 0",
+  "threshold": 0.4964,
+  "metrics": {
+    "accuracy": 0.5975,
+    "balanced_accuracy": 0.6082,
+    "precision": 0.0309,
+    "recall": 0.6193,
+    "specificity": 0.5971,
+    "f1": 0.0589,
+    "roc_auc": 0.6514,
+    "pr_auc_average_precision": 0.0381
+  },
+  "roc_auc_95ci": [
+    0.6211,
+    0.6775
+  ],
+  "confusion_matrix": {
+    "labels": [
+      "no_sepsis_within_6h",
+      "sepsis_within_6h"
+    ],
+    "rows_actual_columns_predicted": [
+      [
+        76057,
+        51326
+      ],
+      [
+        1007,
+        1638
+      ]
+    ]
+  },
+  "limitations": [
+    "Seven bedside vitals from a single hour carry limited sepsis signal; the extended set adds trends but still no labs or treatments, so both are below challenge entries that used all 40 variables.",
+    "Retrospective data from two US hospital systems; not externally or prospectively validated.",
+    "Patient-hours are correlated; confidence intervals use a patient-level bootstrap.",
+    "Not clinically validated. Not for diagnosis, triage or treatment decisions.",
+    "The risk score is a class-weighted probability, not a calibrated absolute risk.",
+    "Only about 2% of patient-hours are positive: precision is low and accuracy alone is misleading."
+  ],
+  "demo_only": true,
+  "clinically_validated": false
+}

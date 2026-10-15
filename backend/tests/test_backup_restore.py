@@ -16,7 +16,7 @@ ELEVATED = {"patient_id": "DEMO-BACKUP-001", "age": 70, "heart_rate": 180, "spo2
 def _seed_records() -> None:
     with TestClient(app) as client:
         client.post("/api/v1/risk/predict", json=ELEVATED)
-        client.post("/api/v1/demo/observations", json={"patient_id": "DEMO-BACKUP-002", "scenario": "worsening", "step": 2})
+        client.post("/api/v1/demo/observations", json={"patient_id": "DEMO-BACKUP-002", "scenario": "worsening", "step": 8})
         alert_id = client.get("/api/v1/alerts", headers=AUTH).json()["items"][0]["id"]
         client.post(f"/api/v1/alerts/{alert_id}/acknowledge", headers=AUTH, json={"actor": "demo-nurse"})
         client.post(f"/api/v1/alerts/{alert_id}/resolve", headers=AUTH, json={"actor": "demo-nurse"})

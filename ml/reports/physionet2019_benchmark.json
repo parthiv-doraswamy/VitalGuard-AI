@@ -1,0 +1,2214 @@
+{
+ "format": "vitalguard-benchmark-report",
+ "version": 1,
+ "created_at": "2026-10-15T04:48:35.691449+00:00",
+ "dataset": {
+  "name": "PhysioNet/Computing in Cardiology Challenge 2019 \u2014 Early Prediction of Sepsis from Clinical Data",
+  "url": "https://physionet.org/content/challenge-2019/1.0.0/",
+  "license": "Creative Commons Attribution 4.0 International",
+  "citation": "Reyna MA, Josef CS, Jeter R, et al. Early Prediction of Sepsis From Clinical Data: the PhysioNet/Computing in Cardiology Challenge 2019. Crit Care Med. 2020;48(2):210-217.",
+  "kind": "public-research",
+  "unit_of_prediction": "one ICU patient-hour",
+  "label": "SepsisLabel: 1 from 6 hours before clinical sepsis onset (Sepsis-3), else 0",
+  "feature_sets": {
+   "api_vitals": [
+    "age",
+    "heart_rate",
+    "spo2",
+    "systolic_bp",
+    "diastolic_bp",
+    "temperature",
+    "respiratory_rate"
+   ],
+   "extended": [
+    "age",
+    "heart_rate",
+    "spo2",
+    "systolic_bp",
+    "diastolic_bp",
+    "temperature",
+    "respiratory_rate",
+    "map",
+    "iculos_hours",
+    "sex_male",
+    "hosp_to_icu_hours",
+    "heart_rate_change_6h",
+    "spo2_change_6h",
+    "systolic_bp_change_6h",
+    "temperature_change_6h",
+    "respiratory_rate_change_6h",
+    "map_change_6h",
+    "heart_rate_max_6h",
+    "respiratory_rate_max_6h",
+    "temperature_max_6h",
+    "spo2_min_6h",
+    "systolic_bp_min_6h"
+   ]
+  },
+  "preprocessing": [
+   "forward-fill vitals within each patient (past values only)",
+   "diastolic BP derived from MAP as (3\u00b7MAP \u2212 SBP)/2 when not charted",
+   "rows with any missing feature dropped (complete case)",
+   "values outside the API's input ranges dropped; age \u2265 18"
+  ],
+  "split": "by patient: SHA-256(seed:patient id) \u2192 70% train / 15% validation / 15% test",
+  "patients_total": 25089,
+  "rows_total": 969982,
+  "missing_rate_after_forward_fill": {
+   "age": 0.0,
+   "heart_rate": 0.0194,
+   "spo2": 0.0214,
+   "systolic_bp": 0.0435,
+   "diastolic_bp": 0.0438,
+   "temperature": 0.0732,
+   "respiratory_rate": 0.0244
+  },
+  "dbp_derived_from_map_rows": 259917,
+  "patients_used": 24531,
+  "rows_used": 869341,
+  "positive_rows": 17214,
+  "positive_rate": 0.0198,
+  "patients_with_sepsis": 1904,
+  "split_counts": {
+   "train": {
+    "patients": 17229,
+    "rows": 611680,
+    "positive_rows": 11966
+   },
+   "validation": {
+    "patients": 3651,
+    "rows": 127633,
+    "positive_rows": 2603
+   },
+   "test": {
+    "patients": 3651,
+    "rows": 130028,
+    "positive_rows": 2645
+   }
+  },
+  "training_rows_after_negative_sampling": 400000
+ },
+ "protocol": {
+  "threshold": "per model, maximises Youden's J (sensitivity + specificity \u2212 1) on validation",
+  "selection": "per feature set, highest validation AUPRC; test results are reported only after selection",
+  "deployable_feature_set": "api_vitals (the current API accepts one observation of seven vitals)",
+  "training_sampling": "all positive training rows plus a random sample of negatives (\u2264 400000 rows)",
+  "why_not_accuracy_alone": "Only about 2% of patient-hours are positive, so predicting 'no sepsis' for everyone is ~98% accurate and useless. Balanced accuracy, sensitivity, specificity, AUROC and AUPRC are reported alongside accuracy."
+ },
+ "results": {
+  "api_vitals": {
+   "logistic_regression": {
+    "label": "Logistic Regression",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.4964,
+     "accuracy": 0.6183,
+     "balanced_accuracy": 0.6082,
+     "sensitivity": 0.5978,
+     "specificity": 0.6187,
+     "precision": 0.0316,
+     "f1": 0.06,
+     "confusion_matrix": {
+      "tn": 77357,
+      "fp": 47673,
+      "fn": 1047,
+      "tp": 1556
+     },
+     "auroc": 0.6464,
+     "auprc": 0.0407,
+     "brier": 0.2324
+    },
+    "test": {
+     "threshold": 0.4964,
+     "accuracy": 0.5975,
+     "balanced_accuracy": 0.6082,
+     "sensitivity": 0.6193,
+     "specificity": 0.5971,
+     "precision": 0.0309,
+     "f1": 0.0589,
+     "confusion_matrix": {
+      "tn": 76057,
+      "fp": 51326,
+      "fn": 1007,
+      "tp": 1638
+     },
+     "auroc": 0.6514,
+     "auprc": 0.0381,
+     "brier": 0.2378
+    },
+    "test_auroc_95ci": [
+     0.6211,
+     0.6775
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.6097,
+     "balanced_accuracy": 0.6077,
+     "sensitivity": 0.6057,
+     "specificity": 0.6098
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.0771
+     ],
+     [
+      0.0513,
+      0.1524
+     ],
+     [
+      0.0769,
+      0.2144
+     ],
+     [
+      0.1026,
+      0.2654
+     ],
+     [
+      0.1282,
+      0.3028
+     ],
+     [
+      0.1538,
+      0.3433
+     ],
+     [
+      0.1795,
+      0.38
+     ],
+     [
+      0.2051,
+      0.4117
+     ],
+     [
+      0.2308,
+      0.4386
+     ],
+     [
+      0.2564,
+      0.4654
+     ],
+     [
+      0.2821,
+      0.4938
+     ],
+     [
+      0.3077,
+      0.524
+     ],
+     [
+      0.3333,
+      0.549
+     ],
+     [
+      0.359,
+      0.5728
+     ],
+     [
+      0.3846,
+      0.5977
+     ],
+     [
+      0.4103,
+      0.6265
+     ],
+     [
+      0.4359,
+      0.6567
+     ],
+     [
+      0.4615,
+      0.6805
+     ],
+     [
+      0.4872,
+      0.7112
+     ],
+     [
+      0.5128,
+      0.727
+     ],
+     [
+      0.5385,
+      0.7497
+     ],
+     [
+      0.5641,
+      0.7614
+     ],
+     [
+      0.5897,
+      0.7781
+     ],
+     [
+      0.6154,
+      0.7951
+     ],
+     [
+      0.641,
+      0.8102
+     ],
+     [
+      0.6667,
+      0.8295
+     ],
+     [
+      0.6923,
+      0.8405
+     ],
+     [
+      0.7179,
+      0.8537
+     ],
+     [
+      0.7436,
+      0.8703
+     ],
+     [
+      0.7692,
+      0.8843
+     ],
+     [
+      0.7949,
+      0.8991
+     ],
+     [
+      0.8205,
+      0.9119
+     ],
+     [
+      0.8462,
+      0.9214
+     ],
+     [
+      0.8718,
+      0.9335
+     ],
+     [
+      0.8974,
+      0.9474
+     ],
+     [
+      0.9231,
+      0.9595
+     ],
+     [
+      0.9487,
+      0.972
+     ],
+     [
+      0.9744,
+      0.9868
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 0.1,
+    "p95_single_row_latency_ms": 0.125,
+    "feature_importance": {
+     "age": 0.0603,
+     "heart_rate": 0.2476,
+     "spo2": 0.0506,
+     "systolic_bp": 0.0475,
+     "diastolic_bp": 0.1025,
+     "temperature": 0.2184,
+     "respiratory_rate": 0.273
+    }
+   },
+   "random_forest": {
+    "label": "Random Forest",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.3778,
+     "accuracy": 0.6112,
+     "balanced_accuracy": 0.6165,
+     "sensitivity": 0.622,
+     "specificity": 0.611,
+     "precision": 0.0322,
+     "f1": 0.0613,
+     "confusion_matrix": {
+      "tn": 76389,
+      "fp": 48641,
+      "fn": 984,
+      "tp": 1619
+     },
+     "auroc": 0.6453,
+     "auprc": 0.04,
+     "brier": 0.149
+    },
+    "test": {
+     "threshold": 0.3778,
+     "accuracy": 0.5918,
+     "balanced_accuracy": 0.6049,
+     "sensitivity": 0.6185,
+     "specificity": 0.5913,
+     "precision": 0.0305,
+     "f1": 0.0581,
+     "confusion_matrix": {
+      "tn": 75317,
+      "fp": 52066,
+      "fn": 1009,
+      "tp": 1636
+     },
+     "auroc": 0.6491,
+     "auprc": 0.0417,
+     "brier": 0.1521
+    },
+    "test_auroc_95ci": [
+     0.6238,
+     0.6685
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.8812,
+     "balanced_accuracy": 0.5828,
+     "sensitivity": 0.2718,
+     "specificity": 0.8938
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.0873
+     ],
+     [
+      0.0513,
+      0.1599
+     ],
+     [
+      0.0769,
+      0.217
+     ],
+     [
+      0.1026,
+      0.2631
+     ],
+     [
+      0.1282,
+      0.3059
+     ],
+     [
+      0.1538,
+      0.341
+     ],
+     [
+      0.1795,
+      0.3743
+     ],
+     [
+      0.2051,
+      0.4106
+     ],
+     [
+      0.2308,
+      0.4352
+     ],
+     [
+      0.2564,
+      0.4662
+     ],
+     [
+      0.2821,
+      0.4892
+     ],
+     [
+      0.3077,
+      0.5229
+     ],
+     [
+      0.3333,
+      0.5516
+     ],
+     [
+      0.359,
+      0.572
+     ],
+     [
+      0.3846,
+      0.5977
+     ],
+     [
+      0.4103,
+      0.6197
+     ],
+     [
+      0.4359,
+      0.6371
+     ],
+     [
+      0.4615,
+      0.6609
+     ],
+     [
+      0.4872,
+      0.6839
+     ],
+     [
+      0.5128,
+      0.7055
+     ],
+     [
+      0.5385,
+      0.7308
+     ],
+     [
+      0.5641,
+      0.7497
+     ],
+     [
+      0.5897,
+      0.7671
+     ],
+     [
+      0.6154,
+      0.7887
+     ],
+     [
+      0.641,
+      0.806
+     ],
+     [
+      0.6667,
+      0.8216
+     ],
+     [
+      0.6923,
+      0.8378
+     ],
+     [
+      0.7179,
+      0.8563
+     ],
+     [
+      0.7436,
+      0.8711
+     ],
+     [
+      0.7692,
+      0.8862
+     ],
+     [
+      0.7949,
+      0.9009
+     ],
+     [
+      0.8205,
+      0.9149
+     ],
+     [
+      0.8462,
+      0.9327
+     ],
+     [
+      0.8718,
+      0.9459
+     ],
+     [
+      0.8974,
+      0.9561
+     ],
+     [
+      0.9231,
+      0.9652
+     ],
+     [
+      0.9487,
+      0.9777
+     ],
+     [
+      0.9744,
+      0.9921
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 14.7,
+    "p95_single_row_latency_ms": 13.854,
+    "feature_importance": {
+     "age": 0.1792,
+     "heart_rate": 0.1397,
+     "spo2": 0.0577,
+     "systolic_bp": 0.1055,
+     "diastolic_bp": 0.1057,
+     "temperature": 0.2813,
+     "respiratory_rate": 0.1309
+    }
+   },
+   "hist_gradient_boosting": {
+    "label": "HistGradientBoosting",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.4109,
+     "accuracy": 0.6159,
+     "balanced_accuracy": 0.6149,
+     "sensitivity": 0.6139,
+     "specificity": 0.6159,
+     "precision": 0.0322,
+     "f1": 0.0612,
+     "confusion_matrix": {
+      "tn": 77012,
+      "fp": 48018,
+      "fn": 1005,
+      "tp": 1598
+     },
+     "auroc": 0.6489,
+     "auprc": 0.0388,
+     "brier": 0.1728
+    },
+    "test": {
+     "threshold": 0.4109,
+     "accuracy": 0.6007,
+     "balanced_accuracy": 0.6118,
+     "sensitivity": 0.6234,
+     "specificity": 0.6002,
+     "precision": 0.0314,
+     "f1": 0.0597,
+     "confusion_matrix": {
+      "tn": 76460,
+      "fp": 50923,
+      "fn": 996,
+      "tp": 1649
+     },
+     "auroc": 0.6525,
+     "auprc": 0.0441,
+     "brier": 0.1779
+    },
+    "test_auroc_95ci": [
+     0.6284,
+     0.6751
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.7565,
+     "balanced_accuracy": 0.6079,
+     "sensitivity": 0.4529,
+     "specificity": 0.7628
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.0941
+     ],
+     [
+      0.0513,
+      0.1577
+     ],
+     [
+      0.0769,
+      0.2136
+     ],
+     [
+      0.1026,
+      0.2647
+     ],
+     [
+      0.1282,
+      0.3093
+     ],
+     [
+      0.1538,
+      0.3433
+     ],
+     [
+      0.1795,
+      0.3762
+     ],
+     [
+      0.2051,
+      0.4053
+     ],
+     [
+      0.2308,
+      0.4435
+     ],
+     [
+      0.2564,
+      0.4805
+     ],
+     [
+      0.2821,
+      0.5085
+     ],
+     [
+      0.3077,
+      0.5399
+     ],
+     [
+      0.3333,
+      0.5641
+     ],
+     [
+      0.359,
+      0.5875
+     ],
+     [
+      0.3846,
+      0.6095
+     ],
+     [
+      0.4103,
+      0.6291
+     ],
+     [
+      0.4359,
+      0.6491
+     ],
+     [
+      0.4615,
+      0.6715
+     ],
+     [
+      0.4872,
+      0.6983
+     ],
+     [
+      0.5128,
+      0.7183
+     ],
+     [
+      0.5385,
+      0.7376
+     ],
+     [
+      0.5641,
+      0.7558
+     ],
+     [
+      0.5897,
+      0.7754
+     ],
+     [
+      0.6154,
+      0.7905
+     ],
+     [
+      0.641,
+      0.8072
+     ],
+     [
+      0.6667,
+      0.8227
+     ],
+     [
+      0.6923,
+      0.8423
+     ],
+     [
+      0.7179,
+      0.8529
+     ],
+     [
+      0.7436,
+      0.8669
+     ],
+     [
+      0.7692,
+      0.8813
+     ],
+     [
+      0.7949,
+      0.8911
+     ],
+     [
+      0.8205,
+      0.9074
+     ],
+     [
+      0.8462,
+      0.9244
+     ],
+     [
+      0.8718,
+      0.9369
+     ],
+     [
+      0.8974,
+      0.9474
+     ],
+     [
+      0.9231,
+      0.9618
+     ],
+     [
+      0.9487,
+      0.9796
+     ],
+     [
+      0.9744,
+      0.9913
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 5.2,
+    "p95_single_row_latency_ms": 20.504,
+    "feature_importance": null
+   },
+   "xgboost": {
+    "label": "XGBoost",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.4694,
+     "accuracy": 0.681,
+     "balanced_accuracy": 0.6233,
+     "sensitivity": 0.5632,
+     "specificity": 0.6834,
+     "precision": 0.0357,
+     "f1": 0.0672,
+     "confusion_matrix": {
+      "tn": 85446,
+      "fp": 39584,
+      "fn": 1137,
+      "tp": 1466
+     },
+     "auroc": 0.6606,
+     "auprc": 0.0402,
+     "brier": 0.1931
+    },
+    "test": {
+     "threshold": 0.4694,
+     "accuracy": 0.6654,
+     "balanced_accuracy": 0.6189,
+     "sensitivity": 0.5705,
+     "specificity": 0.6673,
+     "precision": 0.0344,
+     "f1": 0.0649,
+     "confusion_matrix": {
+      "tn": 85009,
+      "fp": 42374,
+      "fn": 1136,
+      "tp": 1509
+     },
+     "auroc": 0.663,
+     "auprc": 0.0435,
+     "brier": 0.1978
+    },
+    "test_auroc_95ci": [
+     0.6396,
+     0.6863
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.7224,
+     "balanced_accuracy": 0.6156,
+     "sensitivity": 0.5043,
+     "specificity": 0.7269
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.0964
+     ],
+     [
+      0.0513,
+      0.1641
+     ],
+     [
+      0.0769,
+      0.2204
+     ],
+     [
+      0.1026,
+      0.2597
+     ],
+     [
+      0.1282,
+      0.3009
+     ],
+     [
+      0.1538,
+      0.3365
+     ],
+     [
+      0.1795,
+      0.3701
+     ],
+     [
+      0.2051,
+      0.4102
+     ],
+     [
+      0.2308,
+      0.4522
+     ],
+     [
+      0.2564,
+      0.4858
+     ],
+     [
+      0.2821,
+      0.5089
+     ],
+     [
+      0.3077,
+      0.5425
+     ],
+     [
+      0.3333,
+      0.5716
+     ],
+     [
+      0.359,
+      0.6034
+     ],
+     [
+      0.3846,
+      0.6257
+     ],
+     [
+      0.4103,
+      0.645
+     ],
+     [
+      0.4359,
+      0.6662
+     ],
+     [
+      0.4615,
+      0.6881
+     ],
+     [
+      0.4872,
+      0.7127
+     ],
+     [
+      0.5128,
+      0.7301
+     ],
+     [
+      0.5385,
+      0.7558
+     ],
+     [
+      0.5641,
+      0.7728
+     ],
+     [
+      0.5897,
+      0.7883
+     ],
+     [
+      0.6154,
+      0.8072
+     ],
+     [
+      0.641,
+      0.8246
+     ],
+     [
+      0.6667,
+      0.8435
+     ],
+     [
+      0.6923,
+      0.8597
+     ],
+     [
+      0.7179,
+      0.8745
+     ],
+     [
+      0.7436,
+      0.8881
+     ],
+     [
+      0.7692,
+      0.9025
+     ],
+     [
+      0.7949,
+      0.9115
+     ],
+     [
+      0.8205,
+      0.9251
+     ],
+     [
+      0.8462,
+      0.9395
+     ],
+     [
+      0.8718,
+      0.9482
+     ],
+     [
+      0.8974,
+      0.9629
+     ],
+     [
+      0.9231,
+      0.9743
+     ],
+     [
+      0.9487,
+      0.9815
+     ],
+     [
+      0.9744,
+      0.9909
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 2.3,
+    "p95_single_row_latency_ms": 0.198,
+    "feature_importance": {
+     "age": 0.1154,
+     "heart_rate": 0.1452,
+     "spo2": 0.0875,
+     "systolic_bp": 0.1031,
+     "diastolic_bp": 0.1043,
+     "temperature": 0.2652,
+     "respiratory_rate": 0.1793
+    }
+   }
+  },
+  "extended": {
+   "logistic_regression": {
+    "label": "Logistic Regression",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.5022,
+     "accuracy": 0.7796,
+     "balanced_accuracy": 0.6791,
+     "sensitivity": 0.5743,
+     "specificity": 0.7838,
+     "precision": 0.0524,
+     "f1": 0.0961,
+     "confusion_matrix": {
+      "tn": 98004,
+      "fp": 27026,
+      "fn": 1108,
+      "tp": 1495
+     },
+     "auroc": 0.7291,
+     "auprc": 0.0799,
+     "brier": 0.1897
+    },
+    "test": {
+     "threshold": 0.5022,
+     "accuracy": 0.7574,
+     "balanced_accuracy": 0.677,
+     "sensitivity": 0.5932,
+     "specificity": 0.7608,
+     "precision": 0.049,
+     "f1": 0.0905,
+     "confusion_matrix": {
+      "tn": 96909,
+      "fp": 30474,
+      "fn": 1076,
+      "tp": 1569
+     },
+     "auroc": 0.7275,
+     "auprc": 0.0774,
+     "brier": 0.1988
+    },
+    "test_auroc_95ci": [
+     0.6994,
+     0.7527
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.7534,
+     "balanced_accuracy": 0.6764,
+     "sensitivity": 0.5962,
+     "specificity": 0.7567
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0004
+     ],
+     [
+      0.0256,
+      0.1826
+     ],
+     [
+      0.0513,
+      0.3244
+     ],
+     [
+      0.0769,
+      0.397
+     ],
+     [
+      0.1026,
+      0.4529
+     ],
+     [
+      0.1282,
+      0.4953
+     ],
+     [
+      0.1538,
+      0.524
+     ],
+     [
+      0.1795,
+      0.5486
+     ],
+     [
+      0.2051,
+      0.5701
+     ],
+     [
+      0.2308,
+      0.5868
+     ],
+     [
+      0.2564,
+      0.6057
+     ],
+     [
+      0.2821,
+      0.6242
+     ],
+     [
+      0.3077,
+      0.6431
+     ],
+     [
+      0.3333,
+      0.6612
+     ],
+     [
+      0.359,
+      0.6771
+     ],
+     [
+      0.3846,
+      0.6934
+     ],
+     [
+      0.4103,
+      0.7096
+     ],
+     [
+      0.4359,
+      0.7217
+     ],
+     [
+      0.4615,
+      0.7418
+     ],
+     [
+      0.4872,
+      0.7561
+     ],
+     [
+      0.5128,
+      0.7671
+     ],
+     [
+      0.5385,
+      0.7837
+     ],
+     [
+      0.5641,
+      0.8023
+     ],
+     [
+      0.5897,
+      0.8155
+     ],
+     [
+      0.6154,
+      0.8295
+     ],
+     [
+      0.641,
+      0.845
+     ],
+     [
+      0.6667,
+      0.8601
+     ],
+     [
+      0.6923,
+      0.8756
+     ],
+     [
+      0.7179,
+      0.8851
+     ],
+     [
+      0.7436,
+      0.8991
+     ],
+     [
+      0.7692,
+      0.9134
+     ],
+     [
+      0.7949,
+      0.9248
+     ],
+     [
+      0.8205,
+      0.9353
+     ],
+     [
+      0.8462,
+      0.9437
+     ],
+     [
+      0.8718,
+      0.9546
+     ],
+     [
+      0.8974,
+      0.9618
+     ],
+     [
+      0.9231,
+      0.9705
+     ],
+     [
+      0.9487,
+      0.9781
+     ],
+     [
+      0.9744,
+      0.9883
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 0.4,
+    "p95_single_row_latency_ms": 0.124,
+    "feature_importance": {
+     "age": 0.0139,
+     "heart_rate": 0.0,
+     "spo2": 0.0447,
+     "systolic_bp": 0.0193,
+     "diastolic_bp": 0.0468,
+     "temperature": 0.0651,
+     "respiratory_rate": 0.0881,
+     "map": 0.0187,
+     "iculos_hours": 0.2008,
+     "sex_male": 0.0204,
+     "hosp_to_icu_hours": 0.0463,
+     "heart_rate_change_6h": 0.025,
+     "spo2_change_6h": 0.0137,
+     "systolic_bp_change_6h": 0.0038,
+     "temperature_change_6h": 0.0519,
+     "respiratory_rate_change_6h": 0.0535,
+     "map_change_6h": 0.013,
+     "heart_rate_max_6h": 0.0789,
+     "respiratory_rate_max_6h": 0.0048,
+     "temperature_max_6h": 0.1065,
+     "spo2_min_6h": 0.0216,
+     "systolic_bp_min_6h": 0.0634
+    }
+   },
+   "random_forest": {
+    "label": "Random Forest",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.3023,
+     "accuracy": 0.744,
+     "balanced_accuracy": 0.7181,
+     "sensitivity": 0.6911,
+     "specificity": 0.7451,
+     "precision": 0.0534,
+     "f1": 0.0992,
+     "confusion_matrix": {
+      "tn": 93158,
+      "fp": 31872,
+      "fn": 804,
+      "tp": 1799
+     },
+     "auroc": 0.7921,
+     "auprc": 0.1122,
+     "brier": 0.096
+    },
+    "test": {
+     "threshold": 0.3023,
+     "accuracy": 0.722,
+     "balanced_accuracy": 0.7122,
+     "sensitivity": 0.7021,
+     "specificity": 0.7224,
+     "precision": 0.0499,
+     "f1": 0.0932,
+     "confusion_matrix": {
+      "tn": 92021,
+      "fp": 35362,
+      "fn": 788,
+      "tp": 1857
+     },
+     "auroc": 0.777,
+     "auprc": 0.1025,
+     "brier": 0.103
+    },
+    "test_auroc_95ci": [
+     0.7492,
+     0.7992
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.9142,
+     "balanced_accuracy": 0.6856,
+     "sensitivity": 0.4473,
+     "specificity": 0.9239
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.228
+     ],
+     [
+      0.0513,
+      0.3739
+     ],
+     [
+      0.0769,
+      0.4491
+     ],
+     [
+      0.1026,
+      0.4945
+     ],
+     [
+      0.1282,
+      0.5418
+     ],
+     [
+      0.1538,
+      0.572
+     ],
+     [
+      0.1795,
+      0.606
+     ],
+     [
+      0.2051,
+      0.6363
+     ],
+     [
+      0.2308,
+      0.6643
+     ],
+     [
+      0.2564,
+      0.687
+     ],
+     [
+      0.2821,
+      0.7032
+     ],
+     [
+      0.3077,
+      0.7225
+     ],
+     [
+      0.3333,
+      0.735
+     ],
+     [
+      0.359,
+      0.7467
+     ],
+     [
+      0.3846,
+      0.7618
+     ],
+     [
+      0.4103,
+      0.7747
+     ],
+     [
+      0.4359,
+      0.7887
+     ],
+     [
+      0.4615,
+      0.8053
+     ],
+     [
+      0.4872,
+      0.8144
+     ],
+     [
+      0.5128,
+      0.828
+     ],
+     [
+      0.5385,
+      0.8423
+     ],
+     [
+      0.5641,
+      0.8605
+     ],
+     [
+      0.5897,
+      0.8737
+     ],
+     [
+      0.6154,
+      0.8858
+     ],
+     [
+      0.641,
+      0.8987
+     ],
+     [
+      0.6667,
+      0.91
+     ],
+     [
+      0.6923,
+      0.9244
+     ],
+     [
+      0.7179,
+      0.9335
+     ],
+     [
+      0.7436,
+      0.9422
+     ],
+     [
+      0.7692,
+      0.9497
+     ],
+     [
+      0.7949,
+      0.9577
+     ],
+     [
+      0.8205,
+      0.9637
+     ],
+     [
+      0.8462,
+      0.9716
+     ],
+     [
+      0.8718,
+      0.9758
+     ],
+     [
+      0.8974,
+      0.983
+     ],
+     [
+      0.9231,
+      0.9868
+     ],
+     [
+      0.9487,
+      0.994
+     ],
+     [
+      0.9744,
+      0.9981
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 26.4,
+    "p95_single_row_latency_ms": 14.226,
+    "feature_importance": {
+     "age": 0.0542,
+     "heart_rate": 0.0327,
+     "spo2": 0.0131,
+     "systolic_bp": 0.0203,
+     "diastolic_bp": 0.0243,
+     "temperature": 0.0773,
+     "respiratory_rate": 0.0273,
+     "map": 0.02,
+     "iculos_hours": 0.3378,
+     "sex_male": 0.0054,
+     "hosp_to_icu_hours": 0.0736,
+     "heart_rate_change_6h": 0.0167,
+     "spo2_change_6h": 0.0082,
+     "systolic_bp_change_6h": 0.0135,
+     "temperature_change_6h": 0.0245,
+     "respiratory_rate_change_6h": 0.0127,
+     "map_change_6h": 0.0131,
+     "heart_rate_max_6h": 0.0418,
+     "respiratory_rate_max_6h": 0.0458,
+     "temperature_max_6h": 0.0745,
+     "spo2_min_6h": 0.0261,
+     "systolic_bp_min_6h": 0.0371
+    }
+   },
+   "hist_gradient_boosting": {
+    "label": "HistGradientBoosting",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.327,
+     "accuracy": 0.7243,
+     "balanced_accuracy": 0.7175,
+     "sensitivity": 0.7103,
+     "specificity": 0.7246,
+     "precision": 0.051,
+     "f1": 0.0951,
+     "confusion_matrix": {
+      "tn": 90599,
+      "fp": 34431,
+      "fn": 754,
+      "tp": 1849
+     },
+     "auroc": 0.7911,
+     "auprc": 0.1101,
+     "brier": 0.111
+    },
+    "test": {
+     "threshold": 0.327,
+     "accuracy": 0.6968,
+     "balanced_accuracy": 0.6971,
+     "sensitivity": 0.6975,
+     "specificity": 0.6968,
+     "precision": 0.0456,
+     "f1": 0.0856,
+     "confusion_matrix": {
+      "tn": 88755,
+      "fp": 38628,
+      "fn": 800,
+      "tp": 1845
+     },
+     "auroc": 0.7657,
+     "auprc": 0.0893,
+     "brier": 0.1227
+    },
+    "test_auroc_95ci": [
+     0.7372,
+     0.7898
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.8524,
+     "balanced_accuracy": 0.7029,
+     "sensitivity": 0.5471,
+     "specificity": 0.8587
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.2163
+     ],
+     [
+      0.0513,
+      0.3467
+     ],
+     [
+      0.0769,
+      0.4318
+     ],
+     [
+      0.1026,
+      0.4862
+     ],
+     [
+      0.1282,
+      0.5289
+     ],
+     [
+      0.1538,
+      0.566
+     ],
+     [
+      0.1795,
+      0.5902
+     ],
+     [
+      0.2051,
+      0.6166
+     ],
+     [
+      0.2308,
+      0.6389
+     ],
+     [
+      0.2564,
+      0.6658
+     ],
+     [
+      0.2821,
+      0.6813
+     ],
+     [
+      0.3077,
+      0.7021
+     ],
+     [
+      0.3333,
+      0.7221
+     ],
+     [
+      0.359,
+      0.7433
+     ],
+     [
+      0.3846,
+      0.7588
+     ],
+     [
+      0.4103,
+      0.7735
+     ],
+     [
+      0.4359,
+      0.7887
+     ],
+     [
+      0.4615,
+      0.8023
+     ],
+     [
+      0.4872,
+      0.8136
+     ],
+     [
+      0.5128,
+      0.8257
+     ],
+     [
+      0.5385,
+      0.8367
+     ],
+     [
+      0.5641,
+      0.8491
+     ],
+     [
+      0.5897,
+      0.8601
+     ],
+     [
+      0.6154,
+      0.8715
+     ],
+     [
+      0.641,
+      0.8805
+     ],
+     [
+      0.6667,
+      0.89
+     ],
+     [
+      0.6923,
+      0.9021
+     ],
+     [
+      0.7179,
+      0.9157
+     ],
+     [
+      0.7436,
+      0.924
+     ],
+     [
+      0.7692,
+      0.9319
+     ],
+     [
+      0.7949,
+      0.9429
+     ],
+     [
+      0.8205,
+      0.9527
+     ],
+     [
+      0.8462,
+      0.9607
+     ],
+     [
+      0.8718,
+      0.9709
+     ],
+     [
+      0.8974,
+      0.9796
+     ],
+     [
+      0.9231,
+      0.9875
+     ],
+     [
+      0.9487,
+      0.994
+     ],
+     [
+      0.9744,
+      0.9992
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 7.5,
+    "p95_single_row_latency_ms": 14.575,
+    "feature_importance": null
+   },
+   "xgboost": {
+    "label": "XGBoost",
+    "kind": "trained",
+    "validation": {
+     "threshold": 0.3932,
+     "accuracy": 0.7474,
+     "balanced_accuracy": 0.7191,
+     "sensitivity": 0.6896,
+     "specificity": 0.7486,
+     "precision": 0.054,
+     "f1": 0.1002,
+     "confusion_matrix": {
+      "tn": 93594,
+      "fp": 31436,
+      "fn": 808,
+      "tp": 1795
+     },
+     "auroc": 0.7914,
+     "auprc": 0.108,
+     "brier": 0.1352
+    },
+    "test": {
+     "threshold": 0.3932,
+     "accuracy": 0.7236,
+     "balanced_accuracy": 0.7053,
+     "sensitivity": 0.6862,
+     "specificity": 0.7244,
+     "precision": 0.0492,
+     "f1": 0.0918,
+     "confusion_matrix": {
+      "tn": 92279,
+      "fp": 35104,
+      "fn": 830,
+      "tp": 1815
+     },
+     "auroc": 0.7747,
+     "auprc": 0.1018,
+     "brier": 0.1463
+    },
+    "test_auroc_95ci": [
+     0.7434,
+     0.8024
+    ],
+    "test_at_0_5": {
+     "accuracy": 0.8269,
+     "balanced_accuracy": 0.7132,
+     "sensitivity": 0.5947,
+     "specificity": 0.8317
+    },
+    "roc_curve": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0256,
+      0.228
+     ],
+     [
+      0.0513,
+      0.3645
+     ],
+     [
+      0.0769,
+      0.4412
+     ],
+     [
+      0.1026,
+      0.4975
+     ],
+     [
+      0.1282,
+      0.5418
+     ],
+     [
+      0.1538,
+      0.5781
+     ],
+     [
+      0.1795,
+      0.606
+     ],
+     [
+      0.2051,
+      0.6363
+     ],
+     [
+      0.2308,
+      0.6556
+     ],
+     [
+      0.2564,
+      0.6749
+     ],
+     [
+      0.2821,
+      0.6922
+     ],
+     [
+      0.3077,
+      0.7195
+     ],
+     [
+      0.3333,
+      0.7395
+     ],
+     [
+      0.359,
+      0.7565
+     ],
+     [
+      0.3846,
+      0.7728
+     ],
+     [
+      0.4103,
+      0.7909
+     ],
+     [
+      0.4359,
+      0.8049
+     ],
+     [
+      0.4615,
+      0.8181
+     ],
+     [
+      0.4872,
+      0.828
+     ],
+     [
+      0.5128,
+      0.8378
+     ],
+     [
+      0.5385,
+      0.8495
+     ],
+     [
+      0.5641,
+      0.859
+     ],
+     [
+      0.5897,
+      0.8665
+     ],
+     [
+      0.6154,
+      0.8749
+     ],
+     [
+      0.641,
+      0.8885
+     ],
+     [
+      0.6667,
+      0.9006
+     ],
+     [
+      0.6923,
+      0.9096
+     ],
+     [
+      0.7179,
+      0.9187
+     ],
+     [
+      0.7436,
+      0.9259
+     ],
+     [
+      0.7692,
+      0.935
+     ],
+     [
+      0.7949,
+      0.9448
+     ],
+     [
+      0.8205,
+      0.9554
+     ],
+     [
+      0.8462,
+      0.9622
+     ],
+     [
+      0.8718,
+      0.9705
+     ],
+     [
+      0.8974,
+      0.9792
+     ],
+     [
+      0.9231,
+      0.9864
+     ],
+     [
+      0.9487,
+      0.9924
+     ],
+     [
+      0.9744,
+      0.9985
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "train_seconds": 2.9,
+    "p95_single_row_latency_ms": 0.389,
+    "feature_importance": {
+     "age": 0.0372,
+     "heart_rate": 0.0295,
+     "spo2": 0.0331,
+     "systolic_bp": 0.0212,
+     "diastolic_bp": 0.0282,
+     "temperature": 0.0738,
+     "respiratory_rate": 0.0284,
+     "map": 0.0206,
+     "iculos_hours": 0.2869,
+     "sex_male": 0.0243,
+     "hosp_to_icu_hours": 0.053,
+     "heart_rate_change_6h": 0.0252,
+     "spo2_change_6h": 0.0175,
+     "systolic_bp_change_6h": 0.0182,
+     "temperature_change_6h": 0.0279,
+     "respiratory_rate_change_6h": 0.02,
+     "map_change_6h": 0.0168,
+     "heart_rate_max_6h": 0.0403,
+     "respiratory_rate_max_6h": 0.0466,
+     "temperature_max_6h": 0.0746,
+     "spo2_min_6h": 0.0351,
+     "systolic_bp_min_6h": 0.0415
+    }
+   }
+  }
+ },
+ "baselines": {
+  "news2_rule": {
+   "label": "NEWS2 rule (no training)",
+   "kind": "baseline",
+   "validation": {
+    "threshold": 1.0,
+    "accuracy": 0.2343,
+    "balanced_accuracy": 0.5535,
+    "sensitivity": 0.8863,
+    "specificity": 0.2208,
+    "precision": 0.0231,
+    "f1": 0.0451,
+    "confusion_matrix": {
+     "tn": 27602,
+     "fp": 97428,
+     "fn": 296,
+     "tp": 2307
+    },
+    "auroc": 0.633,
+    "auprc": 0.0333
+   },
+   "test": {
+    "threshold": 1.0,
+    "accuracy": 0.2249,
+    "balanced_accuracy": 0.5481,
+    "sensitivity": 0.8851,
+    "specificity": 0.2112,
+    "precision": 0.0228,
+    "f1": 0.0444,
+    "confusion_matrix": {
+     "tn": 26906,
+     "fp": 100477,
+     "fn": 304,
+     "tp": 2341
+    },
+    "auroc": 0.6259,
+    "auprc": 0.0318
+   },
+   "test_auroc_95ci": [
+    0.6035,
+    0.6478
+   ],
+   "roc_curve": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0256,
+     0.0633
+    ],
+    [
+     0.0513,
+     0.1247
+    ],
+    [
+     0.0769,
+     0.1766
+    ],
+    [
+     0.1026,
+     0.2189
+    ],
+    [
+     0.1282,
+     0.2611
+    ],
+    [
+     0.1538,
+     0.3003
+    ],
+    [
+     0.1795,
+     0.3358
+    ],
+    [
+     0.2051,
+     0.3712
+    ],
+    [
+     0.2308,
+     0.4067
+    ],
+    [
+     0.2564,
+     0.4412
+    ],
+    [
+     0.2821,
+     0.4671
+    ],
+    [
+     0.3077,
+     0.493
+    ],
+    [
+     0.3333,
+     0.5189
+    ],
+    [
+     0.359,
+     0.5448
+    ],
+    [
+     0.3846,
+     0.5707
+    ],
+    [
+     0.4103,
+     0.5966
+    ],
+    [
+     0.4359,
+     0.6184
+    ],
+    [
+     0.4615,
+     0.6401
+    ],
+    [
+     0.4872,
+     0.6619
+    ],
+    [
+     0.5128,
+     0.6837
+    ],
+    [
+     0.5385,
+     0.7055
+    ],
+    [
+     0.5641,
+     0.7273
+    ],
+    [
+     0.5897,
+     0.7487
+    ],
+    [
+     0.6154,
+     0.7663
+    ],
+    [
+     0.641,
+     0.7839
+    ],
+    [
+     0.6667,
+     0.8014
+    ],
+    [
+     0.6923,
+     0.819
+    ],
+    [
+     0.7179,
+     0.8366
+    ],
+    [
+     0.7436,
+     0.8541
+    ],
+    [
+     0.7692,
+     0.8717
+    ],
+    [
+     0.7949,
+     0.8884
+    ],
+    [
+     0.8205,
+     0.9023
+    ],
+    [
+     0.8462,
+     0.9163
+    ],
+    [
+     0.8718,
+     0.9302
+    ],
+    [
+     0.8974,
+     0.9442
+    ],
+    [
+     0.9231,
+     0.9581
+    ],
+    [
+     0.9487,
+     0.9721
+    ],
+    [
+     0.9744,
+     0.986
+    ],
+    [
+     1.0,
+     1.0
+    ]
+   ]
+  },
+  "majority_class": {
+   "label": "Always 'no sepsis'",
+   "kind": "baseline",
+   "test": {
+    "threshold": 0.5,
+    "accuracy": 0.9797,
+    "balanced_accuracy": 0.5,
+    "sensitivity": 0.0,
+    "specificity": 1.0,
+    "precision": 0.0,
+    "f1": 0.0,
+    "confusion_matrix": {
+     "tn": 127383,
+     "fp": 0,
+     "fn": 2645,
+     "tp": 0
+    },
+    "auroc": 0.5,
+    "auprc": 0.0203
+   }
+  }
+ },
+ "best_by_feature_set": {
+  "api_vitals": "logistic_regression",
+  "extended": "random_forest"
+ },
+ "selected_model": "logistic_regression",
+ "demo_cohort_scores_at_step_45": {
+  "logistic_regression": {
+   "recovering": {
+    "min": 38,
+    "max": 41
+   },
+   "stable": {
+    "min": 32,
+    "max": 42
+   },
+   "worsening": {
+    "min": 82,
+    "max": 86
+   }
+  },
+  "random_forest": {
+   "recovering": {
+    "min": 19,
+    "max": 30
+   },
+   "stable": {
+    "min": 8,
+    "max": 35
+   },
+   "worsening": {
+    "min": 32,
+    "max": 48
+   }
+  },
+  "hist_gradient_boosting": {
+   "recovering": {
+    "min": 14,
+    "max": 34
+   },
+   "stable": {
+    "min": 2,
+    "max": 32
+   },
+   "worsening": {
+    "min": 25,
+    "max": 50
+   }
+  },
+  "xgboost": {
+   "recovering": {
+    "min": 21,
+    "max": 51
+   },
+   "stable": {
+    "min": 7,
+    "max": 36
+   },
+   "worsening": {
+    "min": 29,
+    "max": 55
+   }
+  }
+ },
+ "limitations": [
+  "Seven bedside vitals from a single hour carry limited sepsis signal; the extended set adds trends but still no labs or treatments, so both are below challenge entries that used all 40 variables.",
+  "Retrospective data from two US hospital systems; not externally or prospectively validated.",
+  "Patient-hours are correlated; confidence intervals use a patient-level bootstrap.",
+  "Not clinically validated. Not for diagnosis, triage or treatment decisions."
+ ],
+ "runtime_seconds": 117
+}

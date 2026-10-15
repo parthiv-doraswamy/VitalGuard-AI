@@ -110,7 +110,8 @@ def test_deteriorating_patients_alert_once_per_escalation_not_every_tick(client)
     worsening = {p["id"] for p in patients() if p["scenario"] == "worsening"}
     # Every worsening patient has deteriorated by sequence 45; recovering ones start high but never alert.
     assert set(by_patient) == worsening
-    assert all(severities in (["high", "critical"], ["critical"]) for severities in by_patient.values())
+    # One alert on reaching high and at most one more on escalating to critical.
+    assert all(severities in (["high"], ["high", "critical"], ["critical"]) for severities in by_patient.values())
     # The ICU doctor sees only the ICU patients' alerts.
     icu = client.get("/api/v1/alerts", params={"limit": 100}, headers=auth_headers("doctor.demo")).json()["items"]
     assert icu and {get_patient(item["patient_id"])["ward"] for item in icu} == {"ICU"}

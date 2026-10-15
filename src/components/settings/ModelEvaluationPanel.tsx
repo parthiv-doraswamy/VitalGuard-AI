@@ -40,7 +40,7 @@ export type Evaluation = {
 
 // Rates shown as percentages; anything else numeric is shown as a plain value.
 const RATE_METRICS: Record<string, string> = {
-  accuracy: 'Accuracy', precision: 'Precision', recall: 'Recall', f1: 'F1 score', roc_auc: 'ROC-AUC',
+  accuracy: 'Accuracy', balanced_accuracy: 'Balanced accuracy', precision: 'Precision', recall: 'Recall', f1: 'F1 score', roc_auc: 'ROC-AUC',
   pr_auc_average_precision: 'PR-AUC', sensitivity: 'Sensitivity', specificity: 'Specificity',
   precision_ppv: 'Precision (PPV)', npv: 'NPV',
 };
@@ -165,7 +165,13 @@ export function ModelEvaluationPanel() {
             </ul>
           </div>
         </div>
-        {report.positive_label_definition && <p className="text-xs text-slate-500 mt-3">Synthetic label rule: {report.positive_label_definition}. Metrics show agreement with that generated rule only.</p>}
+        {report.positive_label_definition && (
+          <p className="text-xs text-slate-500 mt-3">
+            {syntheticDemo
+              ? <>Synthetic label rule: {report.positive_label_definition}. Metrics show agreement with that generated rule only.</>
+              : <>Label: {report.positive_label_definition}. {report.evaluation_type}.</>}
+          </p>
+        )}
       </>}
       <p className="mt-3 text-[11px] text-slate-400">This report does not establish safety, clinical accuracy, calibration, or suitability for diagnosis, triage, or treatment.</p>
     </section>

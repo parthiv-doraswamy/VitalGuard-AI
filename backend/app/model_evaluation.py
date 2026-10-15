@@ -99,7 +99,7 @@ def coefficient_contributions(values: dict[str, float]) -> list[dict[str, object
             "feature": feature,
             "observed_value": round(float(value), 3),
             "standardized_log_odds_contribution": round(float(contribution), 5),
-            "direction": "toward_synthetic_positive" if contribution >= 0 else "toward_synthetic_negative",
+            "direction": "toward_positive" if contribution >= 0 else "toward_negative",
             "method": "standardized logistic-regression coefficient contribution",
         })
     return sorted(results, key=lambda item: abs(float(item["standardized_log_odds_contribution"])), reverse=True)

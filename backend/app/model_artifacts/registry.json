@@ -1,7 +1,7 @@
 {
   "format": "vitalguard-model-registry",
-  "active": "synthetic-logreg-0.1.0",
-  "previous": null,
+  "active": "physionet2019-logistic-regression-1.0.0",
+  "previous": "synthetic-logreg-0.1.0",
   "history": [
     {
       "action": "promote",
@@ -9,6 +9,13 @@
       "dataset_kind": "synthetic-demo",
       "note": "Synthetic demo model; no validated research model is available.",
       "at": "2026-10-14T00:00:00+00:00"
+    },
+    {
+      "action": "promote",
+      "version": "physionet2019-logistic-regression-1.0.0",
+      "model_sha256": "8ff18b3e319c23174c2f116648a413559bfdd4f26d7e174a7b79833b36ab0a9a",
+      "dataset_kind": "public-research",
+      "at": "2026-10-15T04:48:46.595540+00:00"
     }
   ]
 }

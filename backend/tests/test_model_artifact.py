@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app import model as model_module
 from app.main import app
-from app.model import DEFAULT_ARTIFACT_DIR, FEATURES, MODEL_VERSION, active_model, build_model, reset_active_model
+from app.model import DEFAULT_ARTIFACT_DIR, FEATURES, MODEL_VERSION, ActiveModel, active_model, build_model, reset_active_model
 from app.model_artifact import ArtifactError, load_artifact
 from app.model_evaluation import evaluate_synthetic_holdout
 from app.synthetic_data import training_data
@@ -47,17 +47,23 @@ def _edit_manifest(directory: Path, **changes):
     path.write_text(json.dumps(manifest))
 
 
-def test_committed_artifact_is_the_active_model():
+def test_committed_registry_serves_the_physionet_model_with_the_synthetic_one_as_fallback():
     model = active_model()
-    assert model.source == "artifact"
-    assert model.version == MODEL_VERSION
-    assert model.manifest["dataset"]["kind"] == "synthetic-demo"
+    assert model.source == "artifact" and model.load_error is None
+    assert model.version == "physionet2019-logistic-regression-1.0.0"
+    assert model.manifest["dataset"]["kind"] == "public-research"
     assert model.manifest["features"] == list(FEATURES)
+    registry = json.loads((DEFAULT_ARTIFACT_DIR.parent / "registry.json").read_text())
+    assert registry["previous"] == MODEL_VERSION
+    # The served model separates the demo scenarios: deteriorated vitals score far above normal ones.
+    deteriorated = dict(age=67, heart_rate=138, spo2=85, systolic_bp=86, diastolic_bp=50, temperature=39.3, respiratory_rate=31)
+    normal = dict(age=58, heart_rate=78, spo2=97, systolic_bp=122, diastolic_bp=78, temperature=37.0, respiratory_rate=16)
+    assert model.predict_proba(deteriorated) > 0.65 > 0.5 > model.predict_proba(normal)
 
 
 def test_artifact_reproduces_the_previous_in_process_model_exactly():
     rows, _ = training_data(seed=99, samples=2000)
-    from_artifact = active_model().pipeline.predict_proba(rows)[:, 1]
+    from_artifact = ActiveModel.load(DEFAULT_ARTIFACT_DIR).pipeline.predict_proba(rows)[:, 1]
     rebuilt = build_model().predict_proba(rows)[:, 1]
     assert np.allclose(from_artifact, rebuilt, rtol=0, atol=1e-12)
 
@@ -151,8 +157,8 @@ def test_model_info_reports_artifact_provenance(tmp_path, monkeypatch):
     with TestClient(app) as client:
         info = client.get("/api/v1/model/info").json()
     assert info["model_source"] == "artifact"
-    assert info["training_data"] == "generated synthetic observations only"
-    assert info["artifact"]["dataset_kind"] == "synthetic-demo"
+    assert info["training_data"] == "PhysioNet/CinC Challenge 2019 sepsis data (7 vitals, hourly)"
+    assert info["artifact"]["dataset_kind"] == "public-research"
     assert len(info["artifact"]["sha256"]) == 64
     assert info["clinically_validated"] is False and info["load_error"] is None
 

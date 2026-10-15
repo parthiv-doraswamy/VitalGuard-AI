@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "vitest/globals", "vite-plugin-pwa/client"]
   },
-  "include": ["src", "backend/app/data/*.json", "backend/app/model_artifacts/*.json"]
+  "include": ["src", "backend/app/data/*.json", "backend/app/model_artifacts/*.json", "ml/reports/*.json"]
 }

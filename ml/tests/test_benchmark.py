@@ -167,7 +167,9 @@ def registry_root(tmp_path):
     root = tmp_path / "model_artifacts"
     root.mkdir()
     shutil.copytree(DEFAULT_ARTIFACT_DIR, root / DEFAULT_ARTIFACT_DIR.name)
-    shutil.copy(DEFAULT_ARTIFACT_DIR.parent / "registry.json", root / "registry.json")
+    # A store holding only the synthetic demo artifact, active with no previous version.
+    (root / "registry.json").write_text(json.dumps({"format": "vitalguard-model-registry",
+                                                    "active": DEFAULT_ARTIFACT_DIR.name, "previous": None, "history": []}))
     return root
 
 

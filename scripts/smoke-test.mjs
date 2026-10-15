@@ -76,11 +76,13 @@ async function main() {
   const { data: evaluation } = await request('/api/v1/model/evaluation');
   assert.equal(evaluation.demo_only, true);
   assert.equal(evaluation.clinically_validated, false);
-  assert.equal(evaluation.sample_count, 3000);
+  // The evaluation must describe the model actually serving predictions.
+  assert.equal(evaluation.model_version, model.model_version, 'Evaluation report must match the active model');
+  assert.ok(Number.isInteger(evaluation.sample_count) && evaluation.sample_count > 0);
   for (const metric of ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']) {
-    assert.ok(evaluation.metrics[metric] >= 0 && evaluation.metrics[metric] <= 1, 'Invalid synthetic metric: ' + metric);
+    assert.ok(evaluation.metrics[metric] >= 0 && evaluation.metrics[metric] <= 1, 'Invalid metric: ' + metric);
   }
-  console.log('✓ Reproducible synthetic holdout evaluation');
+  console.log(`✓ Held-out evaluation of the active model (${model.model_version}, ${evaluation.sample_count} samples)`);
 
   const { data: news2 } = await request('/api/v1/scores/news2', {
     method: 'POST',
@@ -236,18 +238,28 @@ async function main() {
       systolic_bp: 80, diastolic_bp: 50, temperature: 39.5, respiratory_rate: 34,
     }),
   });
-  const { data: alerts } = await request('/api/v1/alerts?patient_id=' + encodeURIComponent(alertPatientId) + '&limit=10');
+  // Alert endpoints require a signed-in demo account (admin can see and act on every patient).
+  const unauthenticated = await fetch(`${baseUrl}/api/v1/alerts?limit=1`, { signal: AbortSignal.timeout(timeoutMs) });
+  assert.equal(unauthenticated.status, 401, 'Alert list must require sign-in');
+  const { data: login } = await request('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin.demo', password: process.env.VITALGUARD_DEMO_PASSWORD || 'demo-access' }),
+  });
+  assert.equal(login.user.role, 'admin');
+  const auth = { Authorization: 'Bearer ' + login.token };
+  console.log('✓ Demo sign-in and role-protected alert endpoints');
+  const { data: alerts } = await request('/api/v1/alerts?patient_id=' + encodeURIComponent(alertPatientId) + '&limit=10', { headers: auth });
   assert.ok(alerts.items.length > 0, 'Elevated synthetic prediction should create a demo alert');
   const alertId = alerts.items[0].id;
   const { data: acknowledged } = await request('/api/v1/alerts/' + alertId + '/acknowledge', {
-    method: 'POST', body: JSON.stringify({ actor: 'smoke-test-demo-operator' }),
+    method: 'POST', headers: auth, body: JSON.stringify({ actor: 'smoke-test-demo-operator' }),
   });
   assert.equal(acknowledged.item.status, 'acknowledged');
   const { data: resolved } = await request('/api/v1/alerts/' + alertId + '/resolve', {
-    method: 'POST', body: JSON.stringify({ actor: 'smoke-test-demo-operator' }),
+    method: 'POST', headers: auth, body: JSON.stringify({ actor: 'smoke-test-demo-operator' }),
   });
   assert.equal(resolved.item.status, 'resolved');
-  const { data: audit } = await request('/api/v1/alerts/' + alertId + '/audit');
+  const { data: audit } = await request('/api/v1/alerts/' + alertId + '/audit', { headers: auth });
   assert.ok(audit.count >= 3, 'Alert audit should include creation, acknowledgement, and resolution');
   console.log('✓ Persistent alert lifecycle and audit trail');
 
