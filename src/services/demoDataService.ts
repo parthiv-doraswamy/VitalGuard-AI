@@ -1,5 +1,7 @@
 import { COHORT, DEMO_PATIENTS } from '../data/demoPatients.ts';
-import { DEMO_RISK, defaultFactors } from '../data/demoRisk.ts';
+import { defaultFactors } from '../data/demoRisk.ts';
+import { riskLevelFor } from './simulation.ts';
+import { news2FromVitals } from '../store/liveIngest.ts';
 import { DEMO_ALERTS } from '../data/demoAlerts.ts';
 import type { Patient, VitalReading, RiskSignal, RiskFactor, AlertItem } from '../types/index.ts';
 
@@ -25,13 +27,19 @@ function generatedHistory(patient: Patient): VitalReading[] {
 }
 
 function generatedRisk(patient: Patient): RiskSignal {
-  const score = patient.scenario === 'worsening' ? 68 + (Number(patient.id.slice(-3)) % 20)
-    : patient.scenario === 'recovering' ? 25 + (Number(patient.id.slice(-3)) % 15)
-      : 8 + (Number(patient.id.slice(-3)) % 20);
+  // Matches where the backend cohort stream starts: worsening patients still have normal
+  // vitals (low risk), recovering patients start abnormal (high risk) and improve.
+  const n = Number(patient.id.slice(-3)) || 1;
+  const score = patient.scenario === 'worsening' ? 18 + (n % 18)
+    : patient.scenario === 'recovering' ? 70 + (n % 15)
+      : 8 + (n % 20);
+  const step = patient.scenario === 'worsening' ? 1 : patient.scenario === 'recovering' ? -2 : 0;
+  const history = generatedHistory(patient);
+  const latest = history[history.length - 1];
   return {
-    patientId: patient.id, score, level: score >= 85 ? 'critical' : score >= 65 ? 'high' : score >= 30 ? 'moderate' : 'low',
-    probability: score / 100, news2: patient.scenario === 'worsening' ? 5 : patient.scenario === 'recovering' ? 3 : 1,
-    trend: patient.scenario, trajectory: [score - 8, score - 5, score - 3, score - 2, score - 1, score],
+    patientId: patient.id, score, level: riskLevelFor(score),
+    probability: score / 100, news2: latest ? news2FromVitals(latest) : 0,
+    trend: patient.scenario, trajectory: [5, 4, 3, 2, 1, 0].map((back) => Math.max(1, score - step * back)),
     trajectoryLabels: ['2h ago', '1.5h ago', '1h ago', '30m ago', 'Now', 'Live'], updatedAt: patient.updatedAt,
   };
 }
@@ -49,12 +57,10 @@ export const demoDataService = {
     return generated.length ? clone(generated[generated.length - 1]) : undefined;
   },
   risk(id: string): RiskSignal | undefined {
-    const known = DEMO_RISK[id];
-    if (known) return clone(known);
     const patient = DEMO_PATIENTS.find((p) => p.id === id);
     return patient ? generatedRisk(patient) : undefined;
   },
-  allRisk(): RiskSignal[] { return clone(DEMO_PATIENTS.map((p) => DEMO_RISK[p.id] ?? generatedRisk(p))); },
+  allRisk(): RiskSignal[] { return DEMO_PATIENTS.map(generatedRisk); },
   factors(id: string): RiskFactor[] { return clone(defaultFactors(id)); },
   alerts(): AlertItem[] { return clone(DEMO_ALERTS); },
 };
