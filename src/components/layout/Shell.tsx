@@ -8,18 +8,18 @@ import { Toasts } from './Toasts.tsx';
 import { useLiveEvents } from '../../services/useLiveEvents.ts';
 import { ConnectionBanner, UpdatePrompt } from './PwaStatus.tsx';
 import { clearSession } from '../../services/auth.ts';
-import { disablePush } from '../../services/notifications.ts';
+import { disablePush, hasPushSubscription } from '../../services/notifications.ts';
 
 export function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   const { status, eventCount, latest } = useLiveEvents();
   const navigate = useNavigate();
   const live = status === 'connected';
   function leaveDemo() {
-    // Stop this device receiving the signed-out user's alert pushes before the session token is dropped.
-    void disablePush().catch(() => undefined).finally(() => {
-      clearSession();
-      navigate('/login', { replace: true });
-    });
+    const finish = () => { clearSession(); navigate('/login', { replace: true }); };
+    if (!hasPushSubscription()) { finish(); return; }
+    // Stop this device receiving the signed-out user's alert pushes; never hold sign-out up for long.
+    const timeout = new Promise((resolve) => window.setTimeout(resolve, 3000));
+    void Promise.race([disablePush().catch(() => undefined), timeout]).finally(finish);
   }
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#f5f8fb] dark:bg-slate-950 text-slate-900 dark:text-slate-100">

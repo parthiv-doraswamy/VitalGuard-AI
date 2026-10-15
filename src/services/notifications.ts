@@ -141,6 +141,11 @@ export async function enablePush(minSeverity: Severity = 'high'): Promise<PushSt
   return { kind: 'on', subscriptionId: stored.subscriptionId, minSeverity };
 }
 
+/** Whether this device has registered a push subscription with the backend. */
+export function hasPushSubscription(): boolean {
+  return readStored() !== null;
+}
+
 export async function disablePush(): Promise<PushState> {
   const stored = readStored();
   if (pushAvailability() === 'supported') {
